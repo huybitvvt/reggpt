@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -9,7 +9,7 @@ namespace SmsWorkbench
                 ? Wpf.Ui.Appearance.ApplicationTheme.Light
                 : Wpf.Ui.Appearance.ApplicationTheme.Dark;
 
-            Log($"切换主题被点击。新主题: {_currentTheme}");
+            Log($"Đã bấm đổi giao diện. Giao diện mới: {_currentTheme}");
 
             try
             {
@@ -17,11 +17,11 @@ namespace SmsWorkbench
                 ApplyCustomThemeColors(_currentTheme);
                 WindowThemeService.ApplyToOpenWindows();
                 ThemeIconGeometry = _currentTheme == Wpf.Ui.Appearance.ApplicationTheme.Dark ? MoonIcon : SunIcon;
-                Log("主题更新应用成功。");
+                Log("Đã áp dụng cập nhật giao diện thành công.");
             }
             catch (Exception ex)
             {
-                Log($"应用主题异常: {ex.Message}");
+                Log($"Lỗi áp dụng giao diện: {ex.Message}");
             }
         }
 

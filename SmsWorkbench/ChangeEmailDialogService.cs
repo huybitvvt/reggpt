@@ -1,4 +1,4 @@
-namespace SmsWorkbench;
+﻿namespace SmsWorkbench;
 
 internal sealed record ChangeEmailDialogOptions(
     string Provider,
@@ -12,11 +12,11 @@ internal static class ChangeEmailDialogService
     private static readonly (string Label, string Value)[] Providers =
     {
         ("ReMail", "remail"),
-        ("CF Worker 域名邮箱", "cfworker"),
+        ("Email tên miền CF Worker", "cfworker"),
         ("Smailr", "smailr"),
-        ("iCloud 邮箱池", "icloud"),
-        ("Outlook 邮箱池", "outlook"),
-        ("Hotmail 邮箱池", "hotmail"),
+        ("Pool email iCloud", "icloud"),
+        ("Pool email Outlook", "outlook"),
+        ("Pool email Hotmail", "hotmail"),
     };
 
     public static ChangeEmailDialogOptions? Show(
@@ -41,12 +41,12 @@ internal static class ChangeEmailDialogService
             Margin = new Thickness(0, 0, 0, 10),
         };
         var fileBox = new TextBox { Width = 210, Margin = new Thickness(0, 0, 8, 10) };
-        var browse = new Button { Content = "选择凭证文件", Margin = new Thickness(0, 0, 0, 10) };
+        var browse = new Button { Content = "Chọn file thông tin đăng nhập", Margin = new Thickness(0, 0, 0, 10) };
         browse.Click += (_, _) =>
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
+                Filter = "File văn bản (*.txt)|*.txt|Tất cả file (*.*)|*.*",
             };
             if (dialog.ShowDialog() == true)
             {
@@ -57,13 +57,13 @@ internal static class ChangeEmailDialogService
         var root = new StackPanel { Margin = new Thickness(20) };
         root.Children.Add(new TextBlock
         {
-            Text = $"目标邮箱 provider（{count} 个账号）",
+            Text = $"Provider email đích ({count} tài khoản)",
             Margin = new Thickness(0, 0, 0, 6),
         });
         root.Children.Add(providerBox);
-        root.Children.Add(new TextBlock { Text = "并发数" });
+        root.Children.Add(new TextBlock { Text = "Số luồng song song" });
         root.Children.Add(workerBox);
-        root.Children.Add(new TextBlock { Text = "iCloud/Outlook/Hotmail 需提供等量凭证文件" });
+        root.Children.Add(new TextBlock { Text = "iCloud/Outlook/Hotmail cần cung cấp số file thông tin đăng nhập tương ứng" });
 
         var fileRow = new StackPanel { Orientation = Orientation.Horizontal };
         fileRow.Children.Add(fileBox);
@@ -75,10 +75,10 @@ internal static class ChangeEmailDialogService
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
-        var ok = new Button { Content = "开始", Width = 80, IsDefault = true };
+        var ok = new Button { Content = "Bắt đầu", Width = 80, IsDefault = true };
         var cancel = new Button
         {
-            Content = "取消",
+            Content = "Hủy",
             Width = 80,
             IsCancel = true,
             Margin = new Thickness(8, 0, 0, 0),
@@ -89,7 +89,7 @@ internal static class ChangeEmailDialogService
 
         var dialogWindow = DialogFactory.Create(
             owner,
-            "邮箱换绑",
+            "Đổi email liên kết",
             460,
             360,
             minWidth: 440,

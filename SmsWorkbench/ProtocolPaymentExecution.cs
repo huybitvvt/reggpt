@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public sealed record ProtocolPaymentExecutionRequest(
         string PaymentMethod,
@@ -35,7 +35,7 @@ namespace SmsWorkbench
             string accountEmail = (request.AccountEmail ?? "").Trim();
             string sessionFile = (request.SessionFile ?? "").Trim();
             if (accountEmail.Length == 0 && sessionFile.Length == 0)
-                throw new InvalidOperationException("协议支付需要账号或 Session 文件");
+                throw new InvalidOperationException("Thanh toán giao thức cần tài khoản hoặc file Session");
 
             var arguments = new List<string>
             {
@@ -86,8 +86,8 @@ namespace SmsWorkbench
             if (request.ProbeOnly)
             {
                 return new ProtocolPaymentExecutionPlan(
-                    methodLabel + " 支付能力探测",
-                    "正在执行 " + methodLabel + " Checkout / Stripe init 能力探测...",
+                    methodLabel + " Kiểm tra khả năng thanh toán",
+                    "Đang chạy " + methodLabel + " kiểm tra khả năng Checkout / Stripe init...",
                     arguments,
                     "payment_method_capability_probe",
                     false);
@@ -95,15 +95,15 @@ namespace SmsWorkbench
             if (method == "blik")
             {
                 return new ProtocolPaymentExecutionPlan(
-                    methodLabel + " 协议支付",
-                    "正在执行 " + methodLabel + " 协议支付...",
+                    methodLabel + " Thanh toán giao thức",
+                    "Đang chạy " + methodLabel + " thanh toán giao thức...",
                     arguments,
                     "execute_payment",
                     true);
             }
             return new ProtocolPaymentExecutionPlan(
-                methodLabel + " 协议提链",
-                "正在执行 " + methodLabel + " 协议提链...",
+                methodLabel + " Trích link giao thức",
+                "Đang chạy " + methodLabel + " trích link giao thức...",
                 arguments,
                 "extract_link",
                 mayHaveSideEffects);
@@ -200,8 +200,8 @@ namespace SmsWorkbench
                     && string.Equals(StringValue(root, "status"), "completed", StringComparison.OrdinalIgnoreCase);
                 bool capabilityCompleted = operation == "payment_method_capability_probe";
                 text.AppendLine(paymentCompleted
-                    ? "[成功] 支付已完成"
-                    : capabilityCompleted ? "[成功] 能力探测完成" : "[成功] 提取成功!");
+                    ? "[Thành công] Thanh toán đã hoàn tất"
+                    : capabilityCompleted ? "[Thành công] Kiểm tra khả năng hoàn tất" : "[Thành công] Trích xuất thành công!");
                 text.AppendLine();
 
                 AppendNonEmptyString(text, root, "message", "", rejectWhitespace: true);
@@ -211,18 +211,18 @@ namespace SmsWorkbench
                         ? statusCode.ToString()
                         : "";
                     if (probeStatus.Length > 0)
-                        text.AppendLine(CultureInfo.InvariantCulture, $"AT 探测: HTTP {probeStatus}");
+                        text.AppendLine(CultureInfo.InvariantCulture, $"Kiểm tra AT: HTTP {probeStatus}");
                 }
                 if (root.TryGetProperty("refreshed", out JsonElement refreshed)
                     && refreshed.ValueKind is JsonValueKind.True or JsonValueKind.False)
-                    text.AppendLine(CultureInfo.InvariantCulture, $"JIT 刷新: {(refreshed.GetBoolean() ? "已获取新 AT" : "未刷新")}");
+                    text.AppendLine(CultureInfo.InvariantCulture, $"JIT Làm mới: {(refreshed.GetBoolean() ? "Đã lấy AT mới" : "Chưa làm mới")}");
                 if (root.TryGetProperty("token_telemetry", out JsonElement telemetry)
                     && telemetry.ValueKind == JsonValueKind.Object)
                 {
                     if (telemetry.TryGetProperty("age_seconds", out JsonElement age))
-                        text.AppendLine(CultureInfo.InvariantCulture, $"AT 年龄: {age} 秒");
+                        text.AppendLine(CultureInfo.InvariantCulture, $"Tuổi AT: {age} giây");
                     if (telemetry.TryGetProperty("expires_in_seconds", out JsonElement expiresIn))
-                        text.AppendLine(CultureInfo.InvariantCulture, $"AT 剩余: {expiresIn} 秒");
+                        text.AppendLine(CultureInfo.InvariantCulture, $"AT còn lại: {expiresIn} giây");
                 }
 
                 string url = "";
@@ -236,35 +236,35 @@ namespace SmsWorkbench
                     && !string.IsNullOrEmpty(urlElement.GetString()))
                 {
                     url = urlElement.GetString() ?? "";
-                    text.AppendLine(CultureInfo.InvariantCulture, $"链接: {SensitiveDataSanitizer.Redact(url)}");
+                    text.AppendLine(CultureInfo.InvariantCulture, $"Link: {SensitiveDataSanitizer.Redact(url)}");
                 }
 
-                AppendString(text, root, "hosted_url", "托管 URL: ");
-                AppendString(text, root, "link_type", "链接类型: ");
-                AppendString(text, root, "run_id", "任务 ID: ");
-                AppendString(text, root, "manager_state", "状态机: ");
-                AppendString(text, root, "state", "执行状态: ");
-                AppendString(text, root, "operation", "执行动作: ");
-                AppendString(text, root, "subscription_plan", "订阅状态: ");
-                AppendString(text, root, "payment_method", "支付方式: ");
+                AppendString(text, root, "hosted_url", "URL hosted: ");
+                AppendString(text, root, "link_type", "LinkLoại: ");
+                AppendString(text, root, "run_id", "Tác vụ ID: ");
+                AppendString(text, root, "manager_state", "State machine: ");
+                AppendString(text, root, "state", "Trạng thái chạy: ");
+                AppendString(text, root, "operation", "Hành động chạy: ");
+                AppendString(text, root, "subscription_plan", "Trạng thái gói đăng ký: ");
+                AppendString(text, root, "payment_method", "Phương thức thanh toán: ");
 
                 if (root.TryGetProperty("card_last4", out JsonElement last4)
                     && !string.IsNullOrWhiteSpace(last4.GetString()))
-                    text.AppendLine("卡片: [REDACTED]");
+                    text.AppendLine("Thẻ: [REDACTED]");
 
                 string qrPath = root.TryGetProperty("qr_path", out JsonElement qrPathElement)
                     ? qrPathElement.GetString() ?? ""
                     : "";
                 if (qrPath.Length > 0)
-                    text.AppendLine(CultureInfo.InvariantCulture, $"QR 图片: {qrPath}");
+                    text.AppendLine(CultureInfo.InvariantCulture, $"Ảnh QR: {qrPath}");
 
                 AppendString(text, root, "cs_id", "CS ID: ");
                 if (root.TryGetProperty("amount", out JsonElement amount))
-                    text.AppendLine(CultureInfo.InvariantCulture, $"金额: {amount}");
-                AppendString(text, root, "currency", "货币: ");
-                AppendNonEmptyString(text, root, "coupon_name", "优惠券: ", rejectWhitespace: false);
+                    text.AppendLine(CultureInfo.InvariantCulture, $"Số tiền: {amount}");
+                AppendString(text, root, "currency", "Tiền tệ: ");
+                AppendNonEmptyString(text, root, "coupon_name", "Coupon: ", rejectWhitespace: false);
                 if (root.TryGetProperty("approval_ok", out JsonElement approval))
-                    text.AppendLine(CultureInfo.InvariantCulture, $"审批状态: {(approval.GetBoolean() ? "已批准" : "待处理/失败")}");
+                    text.AppendLine(CultureInfo.InvariantCulture, $"Trạng thái phê duyệt: {(approval.GetBoolean() ? "Đã phê duyệt" : "Chờ xử lý/Thất bại")}");
                 if (root.TryGetProperty("expires_at", out JsonElement expiresAt))
                 {
                     try
@@ -273,15 +273,15 @@ namespace SmsWorkbench
                         if (expires > 0)
                         {
                             DateTime local = DateTimeOffset.FromUnixTimeSeconds(expires).LocalDateTime;
-                            text.AppendLine(CultureInfo.InvariantCulture, $"过期时间: {local:yyyy-MM-dd HH:mm:ss}");
+                            text.AppendLine(CultureInfo.InvariantCulture, $"Thời gian hết hạn: {local:yyyy-MM-dd HH:mm:ss}");
                         }
                     }
                     catch
                     {
                     }
                 }
-                AppendString(text, root, "target_country", "国家: ");
-                AppendString(text, root, "warning", "警告: ");
+                AppendString(text, root, "target_country", "Quốc gia: ");
+                AppendString(text, root, "warning", "Cảnh báo: ");
 
                 return new ProtocolPaymentResultPresentation(
                     text.ToString().TrimEnd(),
@@ -311,15 +311,15 @@ namespace SmsWorkbench
             string operation = plan?.Operation ?? "";
             string text = terminalState switch
             {
-                "unknown" => "[结果未知，请先核对账号状态，不要重试]",
-                "cancelled" => "[已取消] 协议支付任务已终止",
-                "timed_out" => "[已超时] 协议支付任务超时，可按策略重试",
-                _ => "[失败] 协议支付任务未完成"
+                "unknown" => "[Kết quả không rõ, vui lòng kiểm tra trạng thái tài khoản trước, không thử lại]",
+                "cancelled" => "[Đã hủy] Tác vụ thanh toán giao thức  đã dừng",
+                "timed_out" => "[Đã timeout] Tác vụ thanh toán giao thức  timeout, có thể thử lại theo chiến lược",
+                _ => "[Thất bại] Tác vụ thanh toán giao thức chưa hoàn tất"
             };
             if (operation.Length > 0)
-                text += $"\n执行动作: {operation}";
+                text += $"\nHành động chạy: {operation}";
             if (requiresReconciliation)
-                text += "\n需要对账：请求可能已到达支付服务。";
+                text += "\nCần đối soát: request có thể đã tới dịch vụ thanh toán.";
             return new ProtocolPaymentResultPresentation(
                 text,
                 "",
@@ -348,38 +348,38 @@ namespace SmsWorkbench
                 && state != "cancelled";
             string prefix = state switch
             {
-                "unknown" => "[结果未知，请先核对账号状态，不要重试]",
-                "cancelled" => "[已取消]",
-                "timed_out" => "[已超时]",
-                _ => "[失败]"
+                "unknown" => "[Kết quả không rõ, vui lòng kiểm tra trạng thái tài khoản trước, không thử lại]",
+                "cancelled" => "[Đã hủy]",
+                "timed_out" => "[Đã timeout]",
+                _ => "[Thất bại]"
             };
-            string summary = FirstNonEmpty(decisionText, error, message, decision, "协议支付未完成");
+            string summary = FirstNonEmpty(decisionText, error, message, decision, "Thanh toán giao thức chưa hoàn tất");
             var text = new StringBuilder($"{prefix} {summary}".TrimEnd());
             if (decision.Length > 0 && !string.Equals(decision, summary, StringComparison.Ordinal))
-                text.AppendLine().Append("判定: ").Append(SensitiveDataSanitizer.Redact(decision));
+                text.AppendLine().Append("Kết luận: ").Append(SensitiveDataSanitizer.Redact(decision));
             if (errorCode.Length > 0)
-                text.AppendLine().Append("错误代码: ").Append(SensitiveDataSanitizer.Redact(errorCode));
+                text.AppendLine().Append("Mã lỗi: ").Append(SensitiveDataSanitizer.Redact(errorCode));
             string errorStage = StringValue(root, "error_stage");
             if (errorStage.Length > 0)
-                text.AppendLine().Append("错误阶段: ").Append(SensitiveDataSanitizer.Redact(errorStage));
+                text.AppendLine().Append("LỗiGiai đoạn: ").Append(SensitiveDataSanitizer.Redact(errorStage));
             string paymentMethod = StringValue(root, "payment_method");
             if (paymentMethod.Length > 0)
-                text.AppendLine().Append("支付方式: ").Append(SensitiveDataSanitizer.Redact(paymentMethod));
+                text.AppendLine().Append("Phương thức thanh toán: ").Append(SensitiveDataSanitizer.Redact(paymentMethod));
             string subscriptionPlan = StringValue(root, "subscription_plan");
             if (subscriptionPlan.Length > 0)
-                text.AppendLine().Append("订阅状态: ").Append(SensitiveDataSanitizer.Redact(subscriptionPlan));
+                text.AppendLine().Append("Trạng thái gói đăng ký: ").Append(SensitiveDataSanitizer.Redact(subscriptionPlan));
             if (root.TryGetProperty("amount_due", out JsonElement amountDue)
                 && amountDue.ValueKind is JsonValueKind.Number or JsonValueKind.String)
             {
-                text.AppendLine().Append("应付金额: ").Append(amountDue.ToString());
+                text.AppendLine().Append("Số tiền phải trả: ").Append(amountDue.ToString());
                 string currency = StringValue(root, "currency");
                 if (currency.Length > 0)
                     text.Append(' ').Append(SensitiveDataSanitizer.Redact(currency.ToUpperInvariant()));
             }
             if (requiresReconciliation)
-                text.AppendLine().Append("需要对账：请求可能已到达支付服务。");
+                text.AppendLine().Append("Cần đối soát: request có thể đã tới dịch vụ thanh toán.");
             else if (retryable)
-                text.AppendLine().Append("可重试: 是");
+                text.AppendLine().Append("Có thể thử lại: Có");
             return new ProtocolPaymentResultPresentation(
                 text.ToString(),
                 "",

@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
@@ -45,14 +45,14 @@ namespace SmsWorkbench
             catch (Win32Exception ex)
             {
                 throw new InvalidOperationException(
-                    $"无法启动 Python 解释器 “{PythonExecutable}”: {ex.Message}。" +
-                    "请安装 Python 3.10+ 并加入 PATH,或在 设置 → 数据与文件 → 运行环境 里配置解释器完整路径。", ex);
+                    $"Không thể khởi động Python interpreter \"{PythonExecutable}\": {ex.Message}. " +
+                    "Vui lòng cài Python 3.10+ và thêm vào PATH, hoặc cấu hình đường dẫn interpreter đầy đủ trong Cài đặt → Dữ liệu và file → Môi trường chạy.", ex);
             }
             catch (System.IO.FileNotFoundException ex)
             {
                 throw new InvalidOperationException(
-                    $"找不到 Python 解释器 “{PythonExecutable}”。" +
-                    "请安装 Python 3.10+ 并加入 PATH,或在 设置 → 数据与文件 → 运行环境 里配置解释器完整路径。", ex);
+                    $"Không tìm thấy Python interpreter \"{PythonExecutable}\". " +
+                    "Vui lòng cài Python 3.10+ và thêm vào PATH, hoặc cấu hình đường dẫn interpreter đầy đủ trong Cài đặt → Dữ liệu và file → Môi trường chạy.", ex);
             }
 
             Task stdoutTask = PumpAsync(process.StandardOutput, stdout, BackendOutputChannel.StandardOutput, progress);
@@ -90,7 +90,7 @@ namespace SmsWorkbench
                 // A malformed backend envelope is a *response parse* failure, not
                 // a startup failure (startup failures are the process-did-not-start
                 // InvalidOperationExceptions above). Classify it distinctly so the
-                // caller surfaces "响应解析失败" instead of blaming the interpreter.
+                // caller surfaces "lỗi phân tích phản hồi" instead of blaming the interpreter.
                 _logger.Warning(
                     exception,
                     "Backend response parse failed for {CommandName}; returning no payload instead of classifying as startup failure",

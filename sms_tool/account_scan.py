@@ -599,12 +599,12 @@ def _at_status_label(result, refresh_result=None, oauth_result=None):
     token_probe = (result or {}).get("token_probe") if isinstance((result or {}).get("token_probe"), dict) else {}
     scan_status = str((result or {}).get("scan_status") or "").strip()
     if scan_status == "account_deactivated":
-        return "AT失效"
+        return "AT hết hiệu lực"
     if oauth_ok and not refresh_ok:
-        return "AT失效已刷新"
+        return "AT hết hiệu lực đã làm mới"
     if refresh_ok or bool((result or {}).get("ok")) or _token_probe_is_active(token_probe):
-        return "AT有效"
-    return "AT失效"
+        return "AT hợp lệ"
+    return "AT hết hiệu lực"
 
 
 def _public_oauth_result(result):

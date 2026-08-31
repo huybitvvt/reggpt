@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -16,8 +16,8 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("界面异步操作失败：" + SensitiveDataSanitizer.Redact(ex.Message));
-                NotifyWarning("操作未完成，请查看运行日志。");
+                Log("Thao tác async giao diện thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
+                NotifyWarning("Thao tác chưa hoàn tất, vui lòng xem log chạy.");
             }
         }
 
@@ -62,7 +62,7 @@ namespace SmsWorkbench
                 settingsService.GetString("proxy.registration"),
                 settingsService.GetString("registration_proxy"),
                 settingsService.GetString("proxy.default"));
-            return configured.Length > 0 ? configured : LocalNonPaymentProxy;
+            return configured;
         }
 
         private List<string> GetRegistrationProxyPool()
@@ -84,19 +84,19 @@ namespace SmsWorkbench
                 settingsService.GetString("mailbox_proxy"),
                 settingsService.GetString("email_registration.mailbox_proxy"),
                 settingsService.GetString("proxy.mailbox"));
-            return configured.Length > 0 ? configured : LocalNonPaymentProxy;
+            return configured;
         }
 
-        // Account liveness (测活) must not inherit the rotating/paid registration
+        // Account liveness (kiểm tra sống) must not inherit the rotating/paid registration
         // egress. A proxy-side 402 / quota failure there is an inconclusive probe,
-        // not a dead account, so liveness routes through a fixed local egress
-        // (default http://127.0.0.1:7897) unless an explicit proxy.liveness is set.
+        // not a dead account, so leave it direct unless an explicit liveness
+        // proxy is set.
         private string GetLivenessProxy()
         {
             string configured = FirstNonEmpty(
                 settingsService.GetString("proxy.liveness"),
                 settingsService.GetString("liveness_proxy"));
-            return configured.Length > 0 ? configured : LocalNonPaymentProxy;
+            return configured;
         }
 
         private List<string> GetLivenessProxyPool()
@@ -262,7 +262,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("打开失败：" + ex.Message);
+                Log("Mở thất bại: " + ex.Message);
             }
         }
 
@@ -289,14 +289,14 @@ namespace SmsWorkbench
                 if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ||
                     (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 {
-                    Log("无效链接：" + url);
+                    Log("Link không hợp lệ: " + url);
                     return;
                 }
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
-                Log("打开链接失败：" + ex.Message);
+                Log("Mở link thất bại: " + ex.Message);
             }
         }
 
@@ -308,13 +308,13 @@ namespace SmsWorkbench
             url = await ResolveBackendPaymentUrlAsync(url, accountEmail);
             if (!IsHttpUrl(url))
             {
-                Log("无效支付链接：" + url);
+                Log("Link thanh toán không hợp lệ: " + url);
                 return;
             }
             string chrome = FindChromePath();
             if (chrome.Length == 0)
             {
-                Log("未找到 Chrome，使用系统默认浏览器打开支付链接。");
+                Log("Không tìm thấy Chrome, dùng trình duyệt mặc định để mở link thanh toán.");
                 OpenUrl(url);
                 return;
             }
@@ -329,11 +329,11 @@ namespace SmsWorkbench
                 psi.ArgumentList.Add("--incognito");
                 psi.ArgumentList.Add(url);
                 Process.Start(psi);
-                Log("已用 Chrome 无痕窗口打开支付链接。");
+                Log("Đã mở link thanh toán bằng cửa sổ ẩn danh Chrome.");
             }
             catch (Exception ex)
             {
-                Log("Chrome 打开失败：" + ex.Message);
+                Log("Chrome Mở thất bại: " + ex.Message);
                 OpenUrl(url);
             }
         }
@@ -346,17 +346,17 @@ namespace SmsWorkbench
             url = await ResolveBackendPaymentUrlAsync(url, accountEmail);
             if (!IsHttpUrl(url))
             {
-                Log("无效支付链接，无法复制。");
+                Log("Link thanh toán không hợp lệ, không thể sao chép.");
                 return;
             }
             try
             {
                 Clipboard.SetText(url);
-                Log("支付链接已复制。");
+                Log("Đã sao chép link thanh toán.");
             }
             catch (Exception ex)
             {
-                Log("复制支付链接失败：" + ex.Message);
+                Log("Sao chép link thanh toán thất bại: " + ex.Message);
             }
         }
 
@@ -369,7 +369,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("读取支付链接 backend 失败：" + SensitiveDataSanitizer.Redact(ex.Message));
+                Log("Đọc backend link thanh toán thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
                 return "";
             }
         }
@@ -433,17 +433,17 @@ namespace SmsWorkbench
 
         private void NotifySuccess(string message)
         {
-            snackbarService.Show("完成", message, Wpf.Ui.Controls.ControlAppearance.Success, null, TimeSpan.FromSeconds(4));
+            snackbarService.Show("Hoàn tất", message, Wpf.Ui.Controls.ControlAppearance.Success, null, TimeSpan.FromSeconds(4));
         }
 
         private void NotifyWarning(string message)
         {
-            snackbarService.Show("注意", message, Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(5));
+            snackbarService.Show("Chú ý", message, Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(5));
         }
 
         private void NotifyInfo(string message)
         {
-            snackbarService.Show("提示", message, Wpf.Ui.Controls.ControlAppearance.Info, null, TimeSpan.FromSeconds(4));
+            snackbarService.Show("Thông báo", message, Wpf.Ui.Controls.ControlAppearance.Info, null, TimeSpan.FromSeconds(4));
         }
 
         private void OnPropertyChanged(string name)

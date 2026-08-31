@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 
@@ -39,7 +39,7 @@ namespace SmsWorkbench
                 return;
             }
             Saved = true;
-            Status = "配置已保存。";
+            Status = "Đã lưu cấu hình.";
             CloseRequested?.Invoke(this, EventArgs.Empty);
         }
     }

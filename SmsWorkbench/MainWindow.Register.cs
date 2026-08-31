@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -20,8 +20,8 @@ namespace SmsWorkbench
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
-                Title = "选择邮箱文件"
+                Filter = "File văn bản (*.txt)|*.txt|Tất cả file (*.*)|*.*",
+                Title = "Chọn file email"
             };
             if (dialog.ShowDialog() != true) return;
 
@@ -33,7 +33,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                MessageBox.Show("读取文件失败：" + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Đọc file thất bại: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -41,17 +41,17 @@ namespace SmsWorkbench
             (int imported, int skipped) = MailboxPoolFileStore.ImportSupportedLines(targetFile, lines);
             ChataiMailboxFilePath = targetFile;
             RefreshPools();
-            NotifySuccess($"导入完成：成功 {imported} 条，跳过 {skipped} 条。");
+            NotifySuccess($"Nhập hoàn tất: Thành công {imported} dòng, bỏ qua {skipped} dòng.");
         }
 
         private void ViewInbox_Click(object sender, RoutedEventArgs e)
         {
-            PoolRow row = SelectedEmailRowOrNotify("查看收件箱");
+            PoolRow row = SelectedEmailRowOrNotify("Xem hộp thư");
             if (row == null) return;
             string mailboxLine = FindMailboxLineForRow(row);
             if (string.IsNullOrWhiteSpace(mailboxLine) || MailboxArgForLine(mailboxLine).Length == 0)
             {
-                MessageBox.Show("选中记录缺少可用的邮箱凭据或导入行。", "格式不匹配", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Bản ghi đang chọn thiếu thông tin đăng nhập email hoặc dòng nhập khả dụng.", "Định dạng không khớp", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             ShowInboxDialog(row);
@@ -64,7 +64,7 @@ namespace SmsWorkbench
                 RegisterOptions selectedOptions = ShowSelectedRegisterOptionsDialog(pendingSelectedCount);
                 if (selectedOptions == null) return;
                 var plan = BackendCommandPlanner.CreateMailboxFileRegistration(
-                    "选中未注册邮箱注册",
+                    "Đăng ký email chưa đăng ký đang chọn",
                     pendingMailboxArg,
                     pendingMailboxFile,
                     pendingSelectedCount,
@@ -78,7 +78,7 @@ namespace SmsWorkbench
             }
             if (pendingRowCount > 0)
             {
-                ShowThemedInfoDialog("邮箱记录不完整", "选中的未注册邮箱缺少可用邮箱原始记录，无法直接注册。");
+                ShowThemedInfoDialog("Bản ghi email không đầy đủ", "Email chưa đăng ký đang chọn thiếu bản ghi email gốc khả dụng nên không thể đăng ký trực tiếp.");
                 return;
             }
 
@@ -87,7 +87,7 @@ namespace SmsWorkbench
                 RegisterOptions selectedOptions = ShowSelectedRegisterOptionsDialog(selectedCount);
                 if (selectedOptions == null) return;
                 var plan = BackendCommandPlanner.CreateMailboxFileRegistration(
-                    "选中邮箱注册",
+                    "Đăng ký email đã chọn",
                     selectedArg,
                     selectedFile,
                     selectedCount,
@@ -156,11 +156,11 @@ namespace SmsWorkbench
             string mailboxFile = GetChataiMailboxFilePath();
             if (string.IsNullOrWhiteSpace(mailboxFile) || !File.Exists(mailboxFile))
             {
-                ShowThemedInfoDialog("缺少邮箱文件", "未选择邮箱，且未找到 Chatai 邮箱文件。请先导入邮箱，或勾选要注册的邮箱记录。");
+                ShowThemedInfoDialog("Thiếu file email", "Chưa chọn email và không tìm thấy file email Chatai. Vui lòng nhập email trước hoặc tick bản ghi email cần đăng ký.");
                 return;
             }
             var defaultPlan = BackendCommandPlanner.CreateMailboxFileRegistration(
-                "一键注册",
+                "Đăng ký nhanh",
                 "--chatai-mailbox-file",
                 mailboxFile,
                 options.Count,
@@ -188,7 +188,7 @@ namespace SmsWorkbench
 
         private async Task OneClickSmsAsync()
         {
-            var rows = SelectedEmailRowsOrNotify("接码");
+            var rows = SelectedEmailRowsOrNotify("nhận mã");
             if (rows.Count == 0) return;
 
             if (!await ShowSmsBowerOneClickDialogAsync())
@@ -199,7 +199,7 @@ namespace SmsWorkbench
             if (!TryCreateMailboxFile(rows, out string mailboxArg, out string mailboxFile, out int mailboxCount)
                 || mailboxCount != rows.Count)
             {
-                ShowThemedInfoDialog("未选择邮箱", "一键接码需要读取邮箱验证码。请先导入并选择包含完整邮箱凭据的账号。");
+                ShowThemedInfoDialog("Chưa chọn email", "Nhận mã nhanh cần đọc mã xác minh email. Vui lòng nhập và chọn tài khoản có đủ thông tin đăng nhập email.");
                 return;
             }
 
@@ -231,7 +231,7 @@ namespace SmsWorkbench
                 .ToList();
             if (rows.Count == 0)
             {
-                ShowThemedInfoDialog("账号测活", "没有找到可测活的账号。请先勾选账号，或切换到包含账号的筛选范围。");
+                ShowThemedInfoDialog("Kiểm tra sống tài khoản", "Không tìm thấy tài khoản có thể kiểm tra sống. Vui lòng tick tài khoản hoặc chuyển sang phạm vi lọc có tài khoản.");
                 return;
             }
 
@@ -256,7 +256,7 @@ namespace SmsWorkbench
                 .ToList();
             if (rows.Count == 0)
             {
-                ShowThemedInfoDialog("账号优惠检测", "没有找到可检测的账号。请先勾选账号，或切换到包含账号的筛选范围。");
+                ShowThemedInfoDialog("Kiểm tra ưu đãi tài khoản", "Không tìm thấy tài khoản có thể kiểm tra. Vui lòng tick tài khoản hoặc chuyển sang phạm vi lọc có tài khoản.");
                 return;
             }
 
@@ -271,7 +271,7 @@ namespace SmsWorkbench
         {
             var dialog = new Window
             {
-                Title = "账号测活设置",
+                Title = "Kiểm tra sống tài khoảnCài đặt",
                 Owner = this,
                 Width = 740,
                 MinWidth = 740,
@@ -291,7 +291,7 @@ namespace SmsWorkbench
 
             var title = new TextBlock
             {
-                Text = "测活 " + Math.Max(1, accountCount).ToString() + " 个账号。HTTP 200 表示 AT 有效，HTTP 401 表示 AT 已失效；可勾选 401 自动重登。",
+                Text = "Kiểm tra sống " + Math.Max(1, accountCount).ToString() + " tài khoản. HTTP 200 nghĩa là AT hợp lệ, HTTP 401 nghĩa là AT hết hiệu lực; có thể tick tự đăng nhập lại khi 401.",
                 FontSize = 14,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (Brush)FindResource("TextSub"),
@@ -301,7 +301,7 @@ namespace SmsWorkbench
             Grid.SetColumnSpan(title, 2);
             root.Children.Add(title);
 
-            var workerLabel = new TextBlock { Text = "并发数", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (Brush)FindResource("TextSub") };
+            var workerLabel = new TextBlock { Text = "Số luồng song song", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (Brush)FindResource("TextSub") };
             Grid.SetRow(workerLabel, 1);
             Grid.SetColumn(workerLabel, 0);
             root.Children.Add(workerLabel);
@@ -312,7 +312,7 @@ namespace SmsWorkbench
 
             var autoReloginBox = new CheckBox
             {
-                Content = "401 自动重登（RT / Cookie / 邮箱 OTP / OAuth）",
+                Content = "Tự đăng nhập lại khi 401 (RT / Cookie / OTP email / OAuth)",
                 IsChecked = false,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (Brush)FindResource("TextMain")
@@ -327,8 +327,8 @@ namespace SmsWorkbench
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 8, 0, 0)
             };
-            var cancel = new Button { Content = "取消", Width = 82, Margin = new Thickness(0, 0, 10, 0), Style = (Style)FindResource("SecondaryButton") };
-            var ok = new Button { Content = "开始测活", Width = 98, Style = (Style)FindResource("PrimaryButton") };
+            var cancel = new Button { Content = "Hủy", Width = 82, Margin = new Thickness(0, 0, 10, 0), Style = (Style)FindResource("SecondaryButton") };
+            var ok = new Button { Content = "Bắt đầu kiểm tra", Width = 98, Style = (Style)FindResource("PrimaryButton") };
             actions.Children.Add(cancel);
             actions.Children.Add(ok);
             Grid.SetRow(actions, 2);
@@ -352,7 +352,7 @@ namespace SmsWorkbench
             return dialog.ShowDialog() == true ? selected : null;
         }
 
-        private string ShowPaymentMethodDialog(string title, string labelText = "支付方式")
+        private string ShowPaymentMethodDialog(string title, string labelText = "Phương thức thanh toán")
         {
             var dialog = new Window
             {
@@ -381,8 +381,8 @@ namespace SmsWorkbench
             root.Children.Add(label);
             root.Children.Add(box);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-            var ok = new Button { Content = "开始", Width = 72, Style = (Style)FindResource("PrimaryButton") };
-            var cancel = new Button { Content = "取消", Width = 72 };
+            var ok = new Button { Content = "Bắt đầu", Width = 72, Style = (Style)FindResource("PrimaryButton") };
+            var cancel = new Button { Content = "Hủy", Width = 72 };
             actions.Children.Add(ok);
             actions.Children.Add(cancel);
             Grid.SetRow(actions, 1);
@@ -411,7 +411,7 @@ namespace SmsWorkbench
         {
             var dialog = new Window
             {
-                Title = "选中邮箱注册",
+                Title = "Đăng ký email đã chọn",
                 Owner = this,
                 Width = 560,
                 Height = 278,
@@ -432,7 +432,7 @@ namespace SmsWorkbench
 
             var hint = new TextBlock
             {
-                Text = "已选择 " + Math.Max(1, selectedCount).ToString() + " 个邮箱",
+                Text = "Đã chọn " + Math.Max(1, selectedCount).ToString() + " email",
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextSub")
             };
@@ -440,7 +440,7 @@ namespace SmsWorkbench
             Grid.SetColumnSpan(hint, 2);
             root.Children.Add(hint);
 
-            var workerLabel = new TextBlock { Text = "并发", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
+            var workerLabel = new TextBlock { Text = "Song song", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
             var workerBox = new TextBox { Text = DefaultWorkerCount().ToString(), Margin = new Thickness(0, 0, 0, 10) };
             Grid.SetRow(workerLabel, 1);
             Grid.SetColumn(workerLabel, 0);
@@ -451,7 +451,7 @@ namespace SmsWorkbench
 
             var no2faBox = new CheckBox
             {
-                Content = "关闭 2FA（不注册 TOTP）",
+                Content = "Tắt 2FA (không đăng ký TOTP)",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
@@ -462,7 +462,7 @@ namespace SmsWorkbench
 
             var promotionBox = new CheckBox
             {
-                Content = "注册完成后查询试用优惠",
+                Content = "Tra ưu đãi dùng thử sau khi đăng ký xong",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
@@ -472,8 +472,8 @@ namespace SmsWorkbench
             root.Children.Add(promotionBox);
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-            var ok = new Button { Content = "开始", Width = 72, Style = (Style)FindResource("PrimaryButton") };
-            var cancel = new Button { Content = "取消", Width = 72 };
+            var ok = new Button { Content = "Bắt đầu", Width = 72, Style = (Style)FindResource("PrimaryButton") };
+            var cancel = new Button { Content = "Hủy", Width = 72 };
             actions.Children.Add(ok);
             actions.Children.Add(cancel);
             Grid.SetRow(actions, 4);
@@ -510,7 +510,7 @@ namespace SmsWorkbench
         {
             var dialog = new Window
             {
-                Title = "一键注册",
+                Title = "Đăng ký nhanh",
                 Owner = this,
                 Width = 560,
                 Height = 332,
@@ -530,13 +530,13 @@ namespace SmsWorkbench
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var sourceLabel = new TextBlock { Text = "注册方式", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
+            var sourceLabel = new TextBlock { Text = "Phương thức đăng ký", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
             var sourceBox = new ComboBox { Margin = new Thickness(0, 0, 0, 10) };
-            sourceBox.Items.Add(new ComboBoxItem { Content = "ReMail 邮箱", Tag = "remail_target" });
-            sourceBox.Items.Add(new ComboBoxItem { Content = "Smailr 邮箱", Tag = "smailr" });
-            sourceBox.Items.Add(new ComboBoxItem { Content = "Outlook/Hotmail/iCloud 邮箱池", Tag = "pool" });
-            sourceBox.Items.Add(new ComboBoxItem { Content = "CF Worker 域名邮箱", Tag = "cfworker" });
-            sourceBox.Items.Add(new ComboBoxItem { Content = "手机号注册", Tag = "phone" });
+            sourceBox.Items.Add(new ComboBoxItem { Content = "ReMail Email", Tag = "remail_target" });
+            sourceBox.Items.Add(new ComboBoxItem { Content = "Smailr Email", Tag = "smailr" });
+            sourceBox.Items.Add(new ComboBoxItem { Content = "Pool email Outlook/Hotmail/iCloud", Tag = "pool" });
+            sourceBox.Items.Add(new ComboBoxItem { Content = "Email tên miền CF Worker", Tag = "cfworker" });
+            sourceBox.Items.Add(new ComboBoxItem { Content = "Đăng ký bằng số điện thoại", Tag = "phone" });
             sourceBox.SelectedIndex = 0;
             Grid.SetRow(sourceLabel, 0);
             Grid.SetColumn(sourceLabel, 0);
@@ -545,7 +545,7 @@ namespace SmsWorkbench
             root.Children.Add(sourceLabel);
             root.Children.Add(sourceBox);
 
-            var countLabel = new TextBlock { Text = "数量", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
+            var countLabel = new TextBlock { Text = "Số lượng", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
             var countBox = new TextBox { Text = CountValue().ToString(), Margin = new Thickness(0, 0, 0, 10) };
             Grid.SetRow(countLabel, 1);
             Grid.SetColumn(countLabel, 0);
@@ -554,7 +554,7 @@ namespace SmsWorkbench
             root.Children.Add(countLabel);
             root.Children.Add(countBox);
 
-            var workerLabel = new TextBlock { Text = "并发", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
+            var workerLabel = new TextBlock { Text = "Song song", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 10), Foreground = (System.Windows.Media.Brush)FindResource("TextSub") };
             var workerBox = new TextBox { Text = DefaultWorkerCount().ToString(), Margin = new Thickness(0, 0, 0, 10) };
             Grid.SetRow(workerLabel, 2);
             Grid.SetColumn(workerLabel, 0);
@@ -565,7 +565,7 @@ namespace SmsWorkbench
 
             var no2faBox = new CheckBox
             {
-                Content = "关闭 2FA（不注册 TOTP）",
+                Content = "Tắt 2FA (không đăng ký TOTP)",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
@@ -576,7 +576,7 @@ namespace SmsWorkbench
 
             var promotionBox = new CheckBox
             {
-                Content = "注册完成后查询试用优惠",
+                Content = "Tra ưu đãi dùng thử sau khi đăng ký xong",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
@@ -588,14 +588,14 @@ namespace SmsWorkbench
             void UpdateTargetControls()
             {
                 bool targetMode = string.Equals((sourceBox.SelectedItem as ComboBoxItem)?.Tag as string, "remail_target", StringComparison.OrdinalIgnoreCase);
-                countLabel.Text = targetMode ? "注册数量" : "数量";
+                countLabel.Text = targetMode ? "Đăng kýSố lượng" : "Số lượng";
             }
             sourceBox.SelectionChanged += (_, __) => UpdateTargetControls();
             UpdateTargetControls();
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-            var ok = new Button { Content = "开始", Width = 72, Style = (Style)FindResource("PrimaryButton") };
-            var cancel = new Button { Content = "取消", Width = 72 };
+            var ok = new Button { Content = "Bắt đầu", Width = 72, Style = (Style)FindResource("PrimaryButton") };
+            var cancel = new Button { Content = "Hủy", Width = 72 };
             actions.Children.Add(ok);
             actions.Children.Add(cancel);
             Grid.SetRow(actions, 5);
@@ -693,10 +693,10 @@ namespace SmsWorkbench
         private bool HasRegisteredAccountState(PoolRow row)
         {
             string status = row.Status ?? "";
-            return status.Contains("已注册")
+            return status.Contains("Đã đăng ký")
                 || status.Contains("PayPal")
-                || status.Contains("支付完成")
-                || status.Contains("已导入");
+                || status.Contains("Thanh toán hoàn tất")
+                || status.Contains("Đã nhập");
         }
 
         private string MailboxArgForLine(string line)
@@ -758,7 +758,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("读取邮箱 backend 失败：" + SensitiveDataSanitizer.Redact(ex.Message));
+                Log("Đọc backend email thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
             }
             return "";
         }

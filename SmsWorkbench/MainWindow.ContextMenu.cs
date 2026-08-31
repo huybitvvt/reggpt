@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -46,11 +46,11 @@ namespace SmsWorkbench
                 try
                 {
                     Clipboard.SetText(row.Identifier);
-                    NotifyInfo("邮箱已复制：" + row.Identifier);
+                    NotifyInfo("Đã sao chép email: " + row.Identifier);
                 }
                 catch (Exception ex)
                 {
-                    Log("复制邮箱失败：" + ex.Message);
+                    Log("Sao chép email thất bại: " + ex.Message);
                 }
             }
         }
@@ -62,23 +62,23 @@ namespace SmsWorkbench
         {
             if (AccountGrid?.SelectedItem is not PoolRow row)
             {
-                NotifyWarning("请先选择一个账号。");
+                NotifyWarning("Vui lòng chọn một tài khoản trước.");
                 return;
             }
             string accessToken = await ResolveAccountAccessTokenAsync(row);
             if (string.IsNullOrWhiteSpace(accessToken))
             {
-                NotifyWarning("当前选中账号没有可复制的 AT。");
+                NotifyWarning("Tài khoản đang chọn không có AT để sao chép.");
                 return;
             }
             try
             {
                 Clipboard.SetText(accessToken);
-                NotifyInfo("AT 已复制。");
+                NotifyInfo("Đã sao chép AT.");
             }
             catch (Exception ex)
             {
-                Log("复制 AT 失败：" + ex.Message);
+                Log("Sao chép AT thất bại: " + ex.Message);
             }
         }
 
@@ -90,7 +90,7 @@ namespace SmsWorkbench
             }
             else
             {
-                NotifyWarning("当前选中行无支付链接。");
+                NotifyWarning("Dòng đang chọn không có link thanh toán.");
             }
         }
 
@@ -102,7 +102,7 @@ namespace SmsWorkbench
             }
             else
             {
-                NotifyWarning("当前选中行无支付链接。");
+                NotifyWarning("Dòng đang chọn không có link thanh toán.");
             }
         }
 
@@ -119,7 +119,7 @@ namespace SmsWorkbench
         {
             if (AccountGrid?.SelectedItem is not PoolRow row || string.IsNullOrWhiteSpace(row.Identifier))
             {
-                NotifyWarning("请先选择一个账号。");
+                NotifyWarning("Vui lòng chọn một tài khoản trước.");
                 return;
             }
             await CheckAccountAliveAsync(row);
@@ -141,7 +141,7 @@ namespace SmsWorkbench
             var rows = SelectedRowsOrCurrent().Where(row => row != null && !string.IsNullOrWhiteSpace(row.Identifier)).ToList();
             if (rows.Count == 0)
             {
-                NotifyWarning("请先选择要换绑的账号。");
+                NotifyWarning("Vui lòng chọn tài khoản cần đổi email trước.");
                 return;
             }
             var options = ChangeEmailDialogService.Show(
@@ -167,12 +167,12 @@ namespace SmsWorkbench
             {
                 using var doc = JsonDocument.Parse(json);
                 bool ok = doc.RootElement.TryGetProperty("ok", out var okEl) && okEl.GetBoolean();
-                await DialogFactory.ShowInfoAsync(this, "邮箱换绑", ok ? "邮箱换绑完成。" : "邮箱换绑部分失败，请查看任务结果。 ");
+                await DialogFactory.ShowInfoAsync(this, "Đổi email liên kết", ok ? "Đổi email hoàn tất." : "Đổi email thất bại một phần, vui lòng xem kết quả tác vụ. ");
                 RefreshPools();
             }
             catch
             {
-                await DialogFactory.ShowInfoAsync(this, "邮箱换绑", "未收到有效结果，请查看运行日志。");
+                await DialogFactory.ShowInfoAsync(this, "Đổi email liên kết", "Chưa nhận được kết quả hợp lệ, vui lòng xem log chạy.");
             }
         }
 
@@ -180,26 +180,26 @@ namespace SmsWorkbench
         {
             if (row == null || string.IsNullOrWhiteSpace(row.Identifier))
             {
-                NotifyWarning("请先选择一个账号。");
+                NotifyWarning("Vui lòng chọn một tài khoản trước.");
                 return;
             }
 
             if (!row.HasAccessToken)
             {
-                await DialogFactory.ShowInfoAsync(this, "账号测活", "该账号未获取 Access Token，无法测活。请先登录获取 AT。");
+                await DialogFactory.ShowInfoAsync(this, "Kiểm tra sống tài khoản", "Tài khoản này chưa có Access Token nên không thể kiểm tra sống. Vui lòng đăng nhập để lấy AT trước.");
                 return;
             }
 
             try
             {
-                Log($"正在进行账号测活：{row.Identifier}");
+                Log($"Đang kiểm tra sống tài khoản: {row.Identifier}");
                 var args = new List<string> { "--quota-usage", "--email", row.Identifier, "--refresh-timeout", "45" };
                 AddRegistrationProxy(args);
-                string json = await RunBackendWithResultAsync("账号测活", args);
+                string json = await RunBackendWithResultAsync("Kiểm tra sống tài khoản", args);
 
                 if (string.IsNullOrWhiteSpace(json))
                 {
-                    await DialogFactory.ShowInfoAsync(this, "账号测活", "账号测活失败：未收到有效响应。");
+                    await DialogFactory.ShowInfoAsync(this, "Kiểm tra sống tài khoản", "Kiểm tra sống tài khoản thất bại: chưa nhận được phản hồi hợp lệ.");
                     return;
                 }
 
@@ -209,25 +209,25 @@ namespace SmsWorkbench
                 if (root.TryGetProperty("ok", out var okEl) && okEl.GetBoolean())
                 {
                     string detail = FormatAccountLivenessDetail(root);
-                    await DialogFactory.ShowInfoAsync(this, $"账号测活：{row.Identifier}", detail);
-                    Log($"账号测活成功：{row.Identifier} → AT 有效");
+                    await DialogFactory.ShowInfoAsync(this, $"Kiểm tra sống tài khoản: {row.Identifier}", detail);
+                    Log($"Kiểm tra sống tài khoản thành công: {row.Identifier} → AT hợp lệ");
                     RefreshPools();
                 }
                 else
                 {
-                    string error = root.TryGetProperty("error", out var errEl) ? errEl.GetString() ?? "未知错误" : "未知错误";
+                    string error = root.TryGetProperty("error", out var errEl) ? errEl.GetString() ?? "Lỗi không xác định" : "Lỗi không xác định";
                     string status = root.TryGetProperty("status", out var stEl) ? stEl.GetString() ?? "" : "";
-                    string msg = $"测活失败：{error}";
+                    string msg = $"Kiểm tra sống thất bại: {error}";
                     if (status == "token_invalid")
-                        msg += "\n\n接口返回 HTTP 401，当前 Access Token 已失效。";
-                    await DialogFactory.ShowInfoAsync(this, $"账号测活：{row.Identifier}", msg);
-                    Log($"账号测活失败：{row.Identifier} → {error}");
+                        msg += "\n\nAPI trả về HTTP 401, Access Token hiện tại đã hết hiệu lực.";
+                    await DialogFactory.ShowInfoAsync(this, $"Kiểm tra sống tài khoản: {row.Identifier}", msg);
+                    Log($"Kiểm tra sống tài khoản thất bại: {row.Identifier} → {error}");
                 }
             }
             catch (Exception ex)
             {
-                Log($"账号测活异常：{ex.Message}");
-                await DialogFactory.ShowInfoAsync(this, "账号测活", $"测活异常：{ex.Message}");
+                Log($"Lỗi kiểm tra sống tài khoản: {ex.Message}");
+                await DialogFactory.ShowInfoAsync(this, "Kiểm tra sống tài khoản", $"Lỗi kiểm tra sống: {ex.Message}");
             }
         }
 
@@ -235,8 +235,8 @@ namespace SmsWorkbench
         {
             var sb = new StringBuilder();
             string statusCode = root.TryGetProperty("status_code", out var codeEl) ? codeEl.ToString() : "";
-            sb.AppendLine("状态：AT 有效");
-            sb.AppendLine("接口：HTTP " + (string.IsNullOrWhiteSpace(statusCode) ? "200" : statusCode));
+            sb.AppendLine("Trạng thái: AT hợp lệ");
+            sb.AppendLine("API: HTTP " + (string.IsNullOrWhiteSpace(statusCode) ? "200" : statusCode));
             return sb.ToString().TrimEnd();
         }
     }

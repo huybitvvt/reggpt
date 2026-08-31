@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace SmsWorkbench
@@ -15,7 +15,6 @@ namespace SmsWorkbench
 
     public sealed class SettingsService : ISettingsService
     {
-        private const string LocalProxy = "http://127.0.0.1:7897";
         private static readonly string[] ListSeparators = { "\r\n", "\n", "," };
         private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
         private readonly IApplicationPaths _paths;
@@ -52,7 +51,7 @@ namespace SmsWorkbench
             foreach (SettingFieldViewModel field in fields.Where(field => field.Kind == SettingFieldKind.Number))
             {
                 if (field.Value.Trim().Length > 0 && !int.TryParse(field.Value.Trim(), out _))
-                    return new SettingsSaveResult(false, field.Label + " 必须是整数。");
+                    return new SettingsSaveResult(false, field.Label + "  phải là số nguyên.");
             }
 
             JsonNode matrix;
@@ -60,11 +59,11 @@ namespace SmsWorkbench
             {
                 matrix = JsonNode.Parse(Find(fields, "protocol_payment_matrix").Value);
                 if (matrix is not JsonObject)
-                    return new SettingsSaveResult(false, "地区资格矩阵根节点必须是 JSON 对象。");
+                    return new SettingsSaveResult(false, "Node gốc của ma trận đủ điều kiện khu vực phải là JSON object.");
             }
             catch (Exception exception)
             {
-                return new SettingsSaveResult(false, "地区资格矩阵 JSON 无效：" + exception.Message);
+                return new SettingsSaveResult(false, "JSON ma trận đủ điều kiện khu vực không hợp lệ: " + exception.Message);
             }
 
             try
@@ -73,18 +72,18 @@ namespace SmsWorkbench
                 foreach (SettingFieldViewModel field in fields.Where(field => field.Definition.JsonPath.Length > 0))
                     SetPath(root, field.Definition.JsonPath, ToJsonValue(field));
 
-                // Registration must never silently fall back to a direct
-                // connection when the settings box is left blank.
+                // A blank proxy setting means direct connection.
                 string registrationProxy = ProxyInputNormalizer.Normalize(
-                    First(Find(fields, "registration_proxy").Value.Trim(), LocalProxy));
+                    Find(fields, "registration_proxy").Value.Trim());
                 string mailboxProxy = ProxyInputNormalizer.Normalize(
-                    First(Find(fields, "mailbox_proxy").Value.Trim(), LocalProxy));
+                    Find(fields, "mailbox_proxy").Value.Trim());
                 string[] registrationPool = ProxyInputNormalizer.NormalizeList(
                         Find(fields, "registration_proxy_pool").Value)
                     .Where(value => !string.Equals(value, registrationProxy, StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 var orderedRegistrationPool = new List<string>();
-                orderedRegistrationPool.Add(registrationProxy);
+                if (registrationProxy.Length > 0)
+                    orderedRegistrationPool.Add(registrationProxy);
                 orderedRegistrationPool.AddRange(registrationPool);
                 SetPath(root, "proxy.registration", registrationProxy);
                 SetPath(root, "proxy.default", registrationProxy);
@@ -123,7 +122,7 @@ namespace SmsWorkbench
             }
             catch (Exception exception)
             {
-                return new SettingsSaveResult(false, "配置保存失败：" + exception.Message);
+                return new SettingsSaveResult(false, "Lưu cấu hình thất bại: " + exception.Message);
             }
         }
 
@@ -218,14 +217,12 @@ namespace SmsWorkbench
                     Text(root, "proxy.registration"),
                     Text(root, "registration_proxy"),
                     FirstArray(root, "paypal.proxies"),
-                    Text(root, "proxy.default"),
-                    LocalProxy),
+                    Text(root, "proxy.default")),
                 "registration_proxy_pool" => First(ListText(root, "proxy.pool"), Text(root, "proxy.registration")),
                 "mailbox_proxy" => First(
                     Text(root, "mailbox_proxy"),
                     Text(root, "email_registration.mailbox_proxy"),
-                    Text(root, "proxy.mailbox"),
-                    LocalProxy),
+                    Text(root, "proxy.mailbox")),
                 "smailr_api_key" => First(
                     Text(root, definition.JsonPath),
                     Environment.GetEnvironmentVariable("SMAILR_API_KEY")),

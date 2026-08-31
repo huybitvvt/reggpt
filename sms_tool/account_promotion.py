@@ -98,31 +98,36 @@ def parse_accounts_check(body: Any, *, account_id: str = "") -> dict[str, Any]:
     }
 
 
+AT_INVALID_PROMOTION_STATUS = "AT hết hiệu lực"
+LEGACY_AT_INVALID_PROMOTION_STATUS = "AT失效"
+
+
 def promotion_status_label(result: dict[str, Any]) -> str:
-    """Condense a parsed result into the compact 优惠状态 badge text."""
+    """Condense a parsed result into the compact promotion-status badge text."""
     if not isinstance(result, dict) or not result.get("ok"):
         error = str((result or {}).get("error") or "").lower()
         if "401" in error or "token" in error or "unauthorized" in error:
-            return "AT失效"
-        return "检测失败"
+            return AT_INVALID_PROMOTION_STATUS
+        return "Kiểm tra thất bại"
     plan = str(result.get("current_plan_type") or "").strip().lower()
     if result.get("has_active_subscription") and plan and plan != "free":
-        label = "Plus" if "plus" in plan else (plan or "已订阅")
-        return f"{label.capitalize()}(赠)" if result.get("is_active_subscription_gratis") else f"已订阅·{label}"
+        label = "Plus" if "plus" in plan else (plan or "đã đăng ký")
+        return f"{label.capitalize()}(tặng)" if result.get("is_active_subscription_gratis") else f"Đã đăng ký·{label}"
     if result.get("plus_trial_eligible"):
         pct = result.get("plus_trial_discount_percentage")
         periods = result.get("plus_trial_duration_num_periods")
         period = str(result.get("plus_trial_duration_period") or "").strip()
-        parts = ["可试用Plus"]
+        period_label = {"month": "tháng", "months": "tháng", "year": "năm", "years": "năm"}.get(period, period)
+        parts = ["Có thể dùng thử Plus"]
         if pct not in (None, ""):
             try:
                 parts.append(f"-{int(round(float(pct)))}%")
             except (TypeError, ValueError):
                 pass
-        if periods not in (None, "") and period:
-            parts.append(f"×{periods}{period}")
+        if periods not in (None, "") and period_label:
+            parts.append(f"x{periods} {period_label}")
         return "·".join(parts)
-    return "Free·无优惠"
+    return "Free·không có ưu đãi"
 
 
 def check_account_promotion(
@@ -142,7 +147,7 @@ def check_account_promotion(
     """
     token = _account_token(account)
     if not token:
-        return {"ok": False, "promotion_status": "缺少AT", "error": "missing_access_token"}
+        return {"ok": False, "promotion_status": "Thiếu AT", "error": "missing_access_token"}
 
     had_identity_context = bool(account.get("identity_context")) if isinstance(account, dict) else False
     identity = bind_account_identity(account)
@@ -184,7 +189,7 @@ def check_account_promotion(
                 status_code = 0
                 body = result
         except Exception as exc:
-            return {"ok": False, "promotion_status": "检测失败", "error": str(exc)[:300]}
+            return {"ok": False, "promotion_status": "Kiểm tra thất bại", "error": str(exc)[:300]}
     else:
         normalized_proxy = normalize_proxy_url(resolved_proxy)
         proxies = {"http": normalized_proxy, "https": normalized_proxy} if normalized_proxy else None
@@ -198,15 +203,15 @@ def check_account_promotion(
             for candidate in (str(proxy or "").strip(), str(resolved_proxy or "").strip(), normalized_proxy):
                 if candidate:
                     error = error.replace(candidate, _redact_proxy_url(candidate, empty_placeholder=""))
-            return {"ok": False, "promotion_status": "检测失败", "error": error[:300]}
+            return {"ok": False, "promotion_status": "Kiểm tra thất bại", "error": error[:300]}
         status_code = int(getattr(response, "status_code", 0) or 0)
         try:
             body = response.json()
         except Exception:
-            return {"ok": False, "promotion_status": "检测失败", "error": "invalid_json", "status_code": status_code}
+            return {"ok": False, "promotion_status": "Kiểm tra thất bại", "error": "invalid_json", "status_code": status_code}
 
     if status_code == 401:
-        return {"ok": False, "promotion_status": "AT失效", "error": "token_invalid", "status_code": 401}
+        return {"ok": False, "promotion_status": AT_INVALID_PROMOTION_STATUS, "error": "token_invalid", "status_code": 401}
     if not (200 <= status_code < 300):
         return {"ok": False, "promotion_status": f"HTTP {status_code}", "error": f"http_{status_code}", "status_code": status_code}
 
@@ -246,7 +251,7 @@ def refresh_promotion_statuses(
     max_workers = max(1, min(int(workers or 1), 16, len(accounts) or 1))
     results: list[dict[str, Any]] = []
     run_id = uuid.uuid4().hex
-    _emit_account_batch_event(run_id, "batch_started", "running", total=len(accounts), detail="账号优惠检测开始")
+    _emit_account_batch_event(run_id, "batch_started", "running", total=len(accounts), detail="Bắt đầu kiểm tra ưu đãi tài khoản")
 
     def run(account: dict[str, Any]) -> dict[str, Any]:
         email = str(account.get("email") or "").strip().lower()
@@ -259,14 +264,14 @@ def refresh_promotion_statuses(
             persisted = mark_promotion_status(email, label, promotion_result=probe) if email else False
             result = {"email": email, "ok": bool(probe.get("ok")), "promotion_status": label, "persisted": bool(persisted), "probe": probe}
         except Exception as exc:
-            result = {"email": email, "ok": False, "promotion_status": "检测失败", "persisted": False, "probe": {"ok": False, "error": str(exc)[:200]}}
+            result = {"email": email, "ok": False, "promotion_status": "Kiểm tra thất bại", "persisted": False, "probe": {"ok": False, "error": str(exc)[:200]}}
         _emit_account_batch_event(
             run_id,
             "account_completed",
             "completed" if result.get("ok") else "failed",
             account_ref=email,
             total=len(accounts),
-            detail=str(result.get("promotion_status") or "检测完成"),
+            detail=str(result.get("promotion_status") or "Kiểm tra hoàn tất"),
         )
         return result
 
@@ -276,7 +281,7 @@ def refresh_promotion_statuses(
             results.append(future.result())
 
     success = sum(1 for item in results if item.get("ok"))
-    _emit_account_batch_event(run_id, "batch_completed", "completed", total=len(results), detail=f"完成 {len(results)} 个账号")
+    _emit_account_batch_event(run_id, "batch_completed", "completed", total=len(results), detail=f"Hoàn tất {len(results)} tài khoản")
     return {
         "ok": success == len(results) if results else False,
         "total": len(results),

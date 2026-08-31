@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     internal static class SmsBowerCatalogClient
     {
@@ -60,7 +60,7 @@ namespace SmsWorkbench
             using JsonDocument document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                throw new InvalidDataException("价格接口未返回国家列表");
+                throw new InvalidDataException("API giá không trả về danh sách quốc gia");
             }
 
             foreach (JsonProperty countryProperty in document.RootElement.EnumerateObject())
@@ -201,6 +201,6 @@ namespace SmsWorkbench
         public int Count { get; }
         public string ProviderIds { get; }
         public decimal NumericPrice { get; }
-        public string DisplayName => $"${Price} / 个 · 库存 {Count}";
+        public string DisplayName => $"${Price} / cái · tồn kho {Count}";
     }
 }

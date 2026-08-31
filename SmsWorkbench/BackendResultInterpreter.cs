@@ -1,4 +1,4 @@
-namespace SmsWorkbench;
+﻿namespace SmsWorkbench;
 
 /// <summary>
 /// Window-independent interpreter for backend JSON results that IO-owns
@@ -81,17 +81,17 @@ public static class BackendResultInterpreter
     /// </summary>
     public static string ProbeStatusLabel(Dictionary<string, object> probe)
     {
-        if (IsDeactivatedMap(probe)) return "账号停用";
+        if (IsDeactivatedMap(probe)) return "Tài khoản bị dừng";
         if (BackendJson.GetString(probe, "status_code") == "401"
             || BackendJson.GetString(probe, "status").Equals("token_invalid", StringComparison.OrdinalIgnoreCase))
-            return "AT失效 / HTTP 401";
+            return "AT hết hiệu lực / HTTP 401";
         if (BackendJson.GetBool(probe, "ok"))
         {
             string statusCode = BackendJson.GetString(probe, "status_code");
-            return statusCode.Length > 0 ? "AT有效 / HTTP " + statusCode : "AT有效";
+            return statusCode.Length > 0 ? "AT hợp lệ / HTTP " + statusCode : "AT hợp lệ";
         }
         string failedCode = BackendJson.GetString(probe, "status_code");
-        return failedCode.Length > 0 ? "测活失败 / HTTP " + failedCode : "测活失败";
+        return failedCode.Length > 0 ? "Kiểm tra sống thất bại / HTTP " + failedCode : "Kiểm tra sống thất bại";
     }
 
     /// <summary>
@@ -141,13 +141,13 @@ public static class BackendResultInterpreter
         string value = (status ?? "").Trim().ToLowerInvariant();
         return value switch
         {
-            "alive" => "正常",
-            "alive_probe_inconclusive" => "RT正常 / OAuth深度探测未完成",
-            "account_deactivated" => "账号掉号",
-            "secondary_phone_verification_required" => "手机验证",
-            "phone_verification_required" => "支付完成",
-            "scan_failed" => "扫描失败",
-            _ => value.Length > 0 ? value : "未知"
+            "alive" => "Bình thường",
+            "alive_probe_inconclusive" => "RT bình thường / kiểm tra sâu OAuth chưa hoàn tất",
+            "account_deactivated" => "Tài khoản bị vô hiệu",
+            "secondary_phone_verification_required" => "Xác minh điện thoại",
+            "phone_verification_required" => "Thanh toán hoàn tất",
+            "scan_failed" => "Quét thất bại",
+            _ => value.Length > 0 ? value : "Không rõ"
         };
     }
 
@@ -203,7 +203,7 @@ public static class BackendResultInterpreter
         if (result.TimedOut)
             return new BackendExecutionResult(
                 false,
-                $"[已超时] 后端任务超时 ({(timeoutSeconds ?? 120)}s)",
+                $"[Đã timeout] Tác vụ backend Timeout ({(timeoutSeconds ?? 120)}s)",
                 "timed_out",
                 null);
 
@@ -213,9 +213,9 @@ public static class BackendResultInterpreter
             // argument, 2 = precondition/preflight failure, 3 = runtime
             // failure. Keep the "failed" state (UI depends on it) but surface
             // the category in the message.
-            string prefix = result.ExitCode == 1 ? "[失败·参数]"
-                : result.ExitCode == 2 ? "[失败·前置检查]"
-                : "[失败·运行时]";
+            string prefix = result.ExitCode == 1 ? "[Thất bại·Tham số]"
+                : result.ExitCode == 2 ? "[Thất bại·kiểm tra điều kiện]"
+                : "[Thất bại·runtime]";
             string errorText = SensitiveDataSanitizer.Redact(
                 string.IsNullOrEmpty(result.StandardError) ? result.StandardOutput : result.StandardError);
             return new BackendExecutionResult(
@@ -243,7 +243,7 @@ public static class BackendResultInterpreter
             output = SensitiveDataSanitizer.Redact(result.StandardError);
         return new BackendExecutionResult(
             output.Length > 0,
-            output.Length > 0 ? output : "[完成] 后端任务已结束",
+            output.Length > 0 ? output : "[Hoàn tất] Tác vụ backend Đã kết thúc",
             "completed",
             null);
     }
@@ -253,7 +253,7 @@ public static class BackendResultInterpreter
     /// </summary>
     public static BackendExecutionResult Cancelled(string taskName)
     {
-        return new BackendExecutionResult(false, "[已取消]", "cancelled", null);
+        return new BackendExecutionResult(false, "[Đã hủy]", "cancelled", null);
     }
 
     /// <summary>
@@ -261,6 +261,6 @@ public static class BackendResultInterpreter
     /// </summary>
     public static BackendExecutionResult StartupFailed(string taskName, string message)
     {
-        return new BackendExecutionResult(false, $"[启动失败] {message}", "failed", null);
+        return new BackendExecutionResult(false, $"[Khởi động thất bại] {message}", "failed", null);
     }
 }

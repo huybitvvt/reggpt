@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
 
 namespace SmsWorkbench
@@ -21,7 +21,7 @@ namespace SmsWorkbench
             Key = key;
             Domain = domain;
             RunId = runId;
-            AccountRef = string.IsNullOrWhiteSpace(accountRef) ? "等待账号" : accountRef;
+            AccountRef = string.IsNullOrWhiteSpace(accountRef) ? "Chờ tài khoản" : accountRef;
             Method = method;
             StartedAt = DateTimeOffset.Now;
             foreach (string stage in stages)
@@ -35,11 +35,11 @@ namespace SmsWorkbench
         public ObservableCollection<StageMatrixCell> Cells { get; } = new();
         [ObservableProperty] private string accountRef;
         [ObservableProperty] private string method;
-        [ObservableProperty] private string currentStage = "等待";
+        [ObservableProperty] private string currentStage = "Đang chờ";
         [ObservableProperty] private string status = "running";
         [ObservableProperty] private string elapsed = "0s";
 
-        public string DomainLabel => Domain == "registration" ? "注册" : "支付";
+        public string DomainLabel => Domain == "registration" ? "Đăng ký" : "Thanh toán";
     }
 
     public sealed partial class StageMatrixViewModel : ObservableObject
@@ -61,7 +61,7 @@ namespace SmsWorkbench
         };
 
         public ObservableCollection<StageMatrixRun> Runs { get; } = new();
-        [ObservableProperty] private string summary = "等待后端阶段事件";
+        [ObservableProperty] private string summary = "Chờ sự kiện giai đoạn backend";
 
         public StageMatrixViewModel(IStageMatrixStore store = null)
         {
@@ -124,7 +124,7 @@ namespace SmsWorkbench
                 ? cell.Status
                 : terminalCompleted ? "completed" : "running";
             run.Elapsed = FormatElapsed(DateTimeOffset.Now - run.StartedAt);
-            Summary = $"运行 {Runs.Count(item => item.Status == "running")}  完成 {Runs.Count(item => item.Status == "completed")}  失败 {Runs.Count(item => item.Status == "failed")}";
+            Summary = $"Đang chạy {Runs.Count(item => item.Status == "running")}  Hoàn tất {Runs.Count(item => item.Status == "completed")}  Thất bại {Runs.Count(item => item.Status == "failed")}";
             if (persist)
                 _store?.Append(progress);
         }
@@ -133,7 +133,7 @@ namespace SmsWorkbench
         {
             Runs.Clear();
             _lastSequences.Clear();
-            Summary = "等待后端阶段事件";
+            Summary = "Chờ sự kiện giai đoạn backend";
         }
 
         public void ClearHistory()

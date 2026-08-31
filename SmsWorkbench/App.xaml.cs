@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -44,7 +44,7 @@ namespace SmsWorkbench
         private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
             LogCrash(e.Exception);
-            System.Windows.MessageBox.Show(e.Exception.Message, "运行异常", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(e.Exception.Message, "Lỗi runtime", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             e.Handled = true;
         }
 

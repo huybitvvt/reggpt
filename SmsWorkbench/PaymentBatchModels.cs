@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace SmsWorkbench
 {
@@ -71,8 +71,8 @@ namespace SmsWorkbench
         [ObservableProperty] private string accountRef = "";
         [ObservableProperty] private string progressText = "0%";
         [ObservableProperty] private double progressPercent;
-        [ObservableProperty] private string currentStage = "等待";
-        [ObservableProperty] private string resultStatus = "等待";
+        [ObservableProperty] private string currentStage = "Đang chờ";
+        [ObservableProperty] private string resultStatus = "Đang chờ";
         public string MatrixCell { get; init; } = "";
         public string AuthStatus { get; init; } = "";
         public string RefreshStatus { get; init; } = "";
@@ -91,11 +91,11 @@ namespace SmsWorkbench
             : "";
         public string ResultDisplay => ResultValue.Length > 0
             ? ResultValue
-            : ResultPresent ? "已生成（报告仅保留存在状态）" : Decision;
+            : ResultPresent ? "Đã tạo (báo cáo chỉ giữ trạng thái tồn tại)" : Decision;
         public bool HasCopyableResult => ResultValue.Length > 0;
         public string CopyToolTip => HasCopyableResult
-            ? $"复制{ResultKind}"
-            : ResultPresent ? "报告仅保留支付结果存在状态" : "没有可复制的支付结果";
+            ? $"Sao chép {ResultKind}"
+            : ResultPresent ? "Báo cáo chỉ giữ trạng thái tồn tại của kết quả thanh toán" : "Không có kết quả thanh toán để sao chép";
         public int Attempts { get; init; }
     }
 

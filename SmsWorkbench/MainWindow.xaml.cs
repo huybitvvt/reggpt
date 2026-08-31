@@ -1,10 +1,9 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow : FluentWindow, INotifyPropertyChanged
     {
         private Wpf.Ui.Appearance.ApplicationTheme _currentTheme = Wpf.Ui.Appearance.ApplicationTheme.Light;
         private static readonly HttpClient httpClient = new HttpClient();
-        private const string LocalNonPaymentProxy = "http://127.0.0.1:7897";
         private readonly IBackendClient backendClient;
         private readonly IBackendTaskCoordinator backendTasks;
         private readonly IDesktopReadClient desktopRead;
@@ -21,10 +20,10 @@ namespace SmsWorkbench
         private string searchText = "";
         private string countText = "1";
         private string pageSizeText = "100";
-        private object scopeFilter = "全部";
+        private object scopeFilter = "Tất cả";
         private string logText = "";
-        private string statusText = "就绪";
-        private string pageStatusText = "第 0/0 页";
+        private string statusText = "Sẵn sàng";
+        private string pageStatusText = "Trang 0/0";
         private string totalCountText = "0";
         private string trialCountText = "0";
         private string registeredCountText = "0";
@@ -212,7 +211,7 @@ namespace SmsWorkbench
             ApplyCustomThemeColors(_currentTheme);
             ThemeIconGeometry = _currentTheme == Wpf.Ui.Appearance.ApplicationTheme.Dark ? MoonIcon : SunIcon;
 
-            ScopeFilter = "全部";
+            ScopeFilter = "Tất cả";
             RefreshPools();
             ApplySidebarCompact(false);
         }
@@ -282,7 +281,7 @@ namespace SmsWorkbench
         public string PayPalAmount { get; set; } = "";
         public string PromotionStatus { get; set; } = "";
         public string RefreshTokenStatus { get; set; } = "";
-        public string TwoFactorStatus { get; set; } = "未设置";
+        public string TwoFactorStatus { get; set; } = "Chưa thiết lập";
         public string Phone { get; set; } = "";
         public bool HasAccessToken { get; set; }
         public string AccessTokenProbeStatusCode { get; set; } = "";
@@ -335,10 +334,10 @@ namespace SmsWorkbench
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             string s = (value as string ?? "").Trim();
-            if (s.Equals("oauth_present", StringComparison.OrdinalIgnoreCase)) return "已获取";
-            if (s.Equals("legacy_present", StringComparison.OrdinalIgnoreCase)) return "旧Token";
-            if (s.Equals("no_rt", StringComparison.OrdinalIgnoreCase)) return "无RT";
-            if (s.Equals("missing", StringComparison.OrdinalIgnoreCase)) return "缺失";
+            if (s.Equals("oauth_present", StringComparison.OrdinalIgnoreCase)) return "Đã lấy";
+            if (s.Equals("legacy_present", StringComparison.OrdinalIgnoreCase)) return "Token cũ";
+            if (s.Equals("no_rt", StringComparison.OrdinalIgnoreCase)) return "Không có RT";
+            if (s.Equals("missing", StringComparison.OrdinalIgnoreCase)) return "Thiếu";
             return s.Length > 0 ? s : "—";
         }
 

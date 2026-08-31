@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -14,8 +14,8 @@ namespace SmsWorkbench
             string scope = DisplayText(ScopeFilter);
             string term = (SearchText ?? "").Trim().ToLowerInvariant();
 
-            if (scope == "有试用" && !PromotionStatusPresentation.IsTrialEligible(row.PromotionStatus)) return false;
-            if (scope == "待处理" && !row.Status.Contains("待") && !row.Status.Contains("缺") && !row.Status.Contains("失败")) return false;
+            if (scope == "Có dùng thử" && !PromotionStatusPresentation.IsTrialEligible(row.PromotionStatus)) return false;
+            if (scope == "Chờ xử lý" && !IsAttentionStatus(row.Status)) return false;
             if (term.Length == 0) return true;
 
             string text = (row.Identifier + " " + row.AccountType + " " + row.Status + " " + row.Notes).ToLowerInvariant();
@@ -57,7 +57,7 @@ namespace SmsWorkbench
                 }
                 catch (Exception ex)
                 {
-                    Log("合并读取邮箱池/账号失败，改用分开读取：" + SensitiveDataSanitizer.Redact(ex.Message));
+                    Log("Đọc gộp pool email/tài khoản thất bại, chuyển sang đọc riêng: " + SensitiveDataSanitizer.Redact(ex.Message));
                     await LoadMailboxPoolAsync();
                     await LoadSessionPoolAsync();
                 }
@@ -65,8 +65,8 @@ namespace SmsWorkbench
                 currentPage = 1;
                 UpdateOverview();
                 RefreshPagedRows();
-                StatusText = $"共 {allRows.Count} 条；当前筛选 {filteredCount} 条";
-                Log("邮箱池和 session 状态已刷新。");
+                StatusText = $"Tổng {allRows.Count} dòng; bộ lọc hiện tại {filteredCount} dòng";
+                Log("Đã làm mới trạng thái pool email và session.");
             }
             finally
             {
@@ -95,15 +95,15 @@ namespace SmsWorkbench
 
             int start = filteredCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
             int end = filteredCount == 0 ? 0 : Math.Min(filteredCount, currentPage * pageSize);
-            PageStatusText = $"第 {currentPage}/{pageCount} 页，显示 {start}-{end} / {filteredCount}";
-            StatusText = $"共 {allRows.Count} 条；当前筛选 {filteredCount} 条";
+            PageStatusText = $"Trang {currentPage}/{pageCount} trang, hiển thị {start}-{end} / {filteredCount}";
+            StatusText = $"Tổng {allRows.Count} dòng; bộ lọc hiện tại {filteredCount} dòng";
         }
 
         private void UpdateOverview()
         {
             int trialEligible = allRows.Count(r => PromotionStatusPresentation.IsTrialEligible(r.PromotionStatus));
             int registered = allRows.Count(IsRegisteredRow);
-            int attention = allRows.Count(r => r.Status.Contains("待") || r.Status.Contains("缺") || r.Status.Contains("失败"));
+            int attention = allRows.Count(r => IsAttentionStatus(r.Status));
             TotalCountText = allRows.Count.ToString();
             TrialCountText = trialEligible.ToString();
             RegisteredCountText = registered.ToString();
@@ -114,7 +114,7 @@ namespace SmsWorkbench
         {
             return row.AccountType.Contains("Session")
                 || row.SourcePath.EndsWith(".sqlite3", StringComparison.OrdinalIgnoreCase)
-                || row.Status.Contains("已注册")
+                || HasStatus(row.Status, "Đã đăng ký", "\u5df2\u6ce8\u518c")
                 || row.Status.Contains("PayPal");
         }
 
@@ -124,11 +124,11 @@ namespace SmsWorkbench
             if (string.IsNullOrWhiteSpace(row.Identifier)) return false;
             if (row.HasAccessToken) return true;
             string status = (row.Status + " " + row.PayPalStatus).Trim();
-            return status.Contains("已注册")
-                || status.Contains("待支付")
-                || status.Contains("支付完成")
-                || status.Contains("PM已创建")
-                || status.Contains("已导入")
+            return status.Contains("Đã đăng ký")
+                || status.Contains("Chờ thanh toán")
+                || status.Contains("Thanh toán hoàn tất")
+                || status.Contains("PM đã tạo")
+                || status.Contains("Đã nhập")
                 || status.Contains("Registered")
                 || status.Contains("Payment completed");
         }
@@ -180,7 +180,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("读取邮箱池 backend 失败：" + SensitiveDataSanitizer.Redact(ex.Message));
+                Log("Đọc backend pool email thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
             }
         }
 
@@ -188,7 +188,7 @@ namespace SmsWorkbench
         {
             if (!payload.TryGetProperty("files", out JsonElement files) || files.ValueKind != JsonValueKind.Array)
             {
-                Log("读取邮箱池 backend 失败：响应缺少 files 数组。");
+                Log("Đọc backend pool email thất bại: Phản hồi thiếu mảng files.");
                 return;
             }
             foreach (JsonElement file in files.EnumerateArray())
@@ -245,20 +245,26 @@ namespace SmsWorkbench
 
         private static string MailboxPoolAccountType(string provider) => provider switch
         {
-            "cfworker" => "CFWorker邮箱池",
-            "remail" => "ReMail邮箱池",
-            "smailr" => "Smailr邮箱池",
-            "icloud_url" => "iCloud邮箱池",
-            "gmail" => "Gmail邮箱池",
-            "chatai" => "Chatai邮箱池",
-            _ => "邮箱池",
+            "cfworker" => "Pool email CFWorker",
+            "remail" => "Pool email ReMail",
+            "smailr" => "Pool email Smailr",
+            "icloud_url" => "Pool email iCloud",
+            "gmail" => "Pool email Gmail",
+            "chatai" => "Pool email Chatai",
+            _ => "Pool email",
         };
+
+        private static bool IsAttentionStatus(string status)
+            => HasStatus(status, "Chờ", "chờ", "\u5f85", "Thiếu", "thiếu", "\u7f3a", "Thất bại", "\u5931\u8d25");
+
+        private static bool HasStatus(string text, params string[] values)
+            => values.Any(value => (text ?? "").Contains(value, StringComparison.OrdinalIgnoreCase));
 
         private static string MailboxPoolStatus(string provider, string authMode)
         {
-            if (provider == "gmail") return authMode == "oauth_refresh" ? "已授权" : "可收信";
-            if (provider is "chatai" or "graph" or "chongzhi") return "已授权";
-            return "可收信";
+            if (provider == "gmail") return authMode == "oauth_refresh" ? "Đã ủy quyền" : "Có thể nhận thư";
+            if (provider is "chatai" or "graph" or "chongzhi") return "Đã ủy quyền";
+            return "Có thể nhận thư";
         }
 
         private string MailboxPoolRefreshDisplay(string provider, string refreshToken)
@@ -268,7 +274,7 @@ namespace SmsWorkbench
                 case "cfworker": return "CFWorker";
                 case "remail": return "ReMail";
                 case "smailr": return "Smailr";
-                case "icloud_url": return "接码链接";
+                case "icloud_url": return "Link nhận mã";
                 case "gmail": return refreshToken.Length > 0 ? Mask(refreshToken) : "AppPassword";
                 default: return refreshToken.Length > 0 ? Mask(refreshToken) : "";
             }
@@ -304,7 +310,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("读取账号 backend 失败：" + SensitiveDataSanitizer.Redact(ex.Message));
+                Log("Đọc backend tài khoản thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
             }
         }
 
@@ -312,7 +318,7 @@ namespace SmsWorkbench
         {
             if (!payload.TryGetProperty("accounts", out JsonElement accounts) || accounts.ValueKind != JsonValueKind.Array)
             {
-                Log("读取账号 backend 失败：响应缺少 accounts 数组。");
+                Log("Đọc backend tài khoản thất bại: phản hồi thiếu mảng accounts.");
                 return;
             }
             // Per-refresh values hoisted out of the row loop; each used to
@@ -373,7 +379,7 @@ namespace SmsWorkbench
                     AccountStatusInterpreter.DisplayPayPalStatus(paypalStatus, paypalOk, paypalUrl, paymentMethod),
                     AccountStatusInterpreter.GetPaypalAmount(rawJson)),
                 RefreshTokenStatus = AccountStatusInterpreter.DisplayRtStatus(refreshStatus),
-                TwoFactorStatus = AccountStatusInterpreter.HasTwoFactor(data) ? "已设置" : "未设置",
+                TwoFactorStatus = AccountStatusInterpreter.HasTwoFactor(data) ? "Đã thiết lập" : "Chưa thiết lập",
                 HasAccessToken = hasAccess,
                 AccessTokenProbeStatusCode = AccountStatusInterpreter.GetAccessTokenProbeStatusCode(data),
                 PayPalUrl = paypalUrl,

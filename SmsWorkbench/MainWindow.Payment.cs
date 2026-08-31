@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -15,11 +15,11 @@ namespace SmsWorkbench
 
         private void OpenPayPalLink_Click(object sender, RoutedEventArgs e)
         {
-            PoolRow row = SelectedEmailRowOrNotify("打开支付链接");
+            PoolRow row = SelectedEmailRowOrNotify("Mở link thanh toán");
             if (row == null) return;
             if (string.IsNullOrWhiteSpace(row.PayPalUrl))
             {
-                MessageBox.Show("选中账号没有可打开的支付链接。", "无支付链接", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Tài khoản đang chọn không có link thanh toán để mở.", "Không có link thanh toán", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             OpenPayPalUrl(row.PayPalUrl, row.Identifier);
@@ -50,8 +50,8 @@ namespace SmsWorkbench
             {
                 MessageBox.Show(
                     this,
-                    "已有后端任务正在运行，请先等待其完成或取消后再发起协议支付。",
-                    "任务进行中",
+                    "Đang có tác vụ backend chạy. Vui lòng đợi hoàn tất hoặc hủy trước khi bắt đầu thanh toán giao thức.",
+                    "Tác vụ đang chạy",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -62,7 +62,7 @@ namespace SmsWorkbench
                 : new ProtocolPaymentAccount(selectedAccount.Identifier, SessionFileFor(selectedAccount));
             if (protocolPaymentDialogs == null)
             {
-                MessageBox.Show(this, "协议支付对话框服务未配置。", "配置错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, "Dịch vụ hộp thoại thanh toán giao thức chưa được cấu hình.", "Lỗi cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             protocolPaymentDialogs.ShowDialog(this, account);

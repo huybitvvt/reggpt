@@ -83,7 +83,7 @@ def refresh_local_quota_statuses(
                             clear_stale_promotion_at_marker(email)
                         except Exception:
                             pass
-            status = str(probe.get("quota_status") or probe.get("status") or "未知")
+            status = str(probe.get("quota_status") or probe.get("status") or "Không rõ")
             if relogin and not relogin.get("ok"):
                 status = _relogin_failure_quota_status(relogin)
             persisted = mark_quota_status(email, status, quota_result=probe) if email else False
@@ -101,7 +101,7 @@ def refresh_local_quota_statuses(
             result = {
                 "ok": False,
                 "email": email,
-                "quota_status": "检测失败",
+                "quota_status": "Kiểm tra thất bại",
                 "probe": {"ok": False, "error": str(exc)[:200]},
                 "probe_ok": False,
                 "persisted": False,
@@ -112,7 +112,7 @@ def refresh_local_quota_statuses(
             "completed" if result.get("ok") else "failed",
             account_ref=email,
             total=len(accounts),
-            detail=str(result.get("quota_status") or "检测完成"),
+            detail=str(result.get("quota_status") or "Kiểm tra hoàn tất"),
         )
         return index, result
 
@@ -145,7 +145,7 @@ def refresh_local_quota_statuses(
         "batch_completed",
         "completed",
         total=len(results),
-        detail=f"完成 {len(results)} 个账号",
+        detail=f"Hoàn tất {len(results)} tài khoản",
     )
     return {
         "ok": success == len(results),
@@ -716,13 +716,14 @@ def _mark_successful_relogin(data: dict[str, Any], probe: dict[str, Any], *, now
         "oauth_refresh_http_401",
     )):
         data.pop("error", None)
-    # A previous promotion probe can persist "AT失效". A verified replacement
+    # A previous promotion probe can persist an invalid-AT marker. A verified replacement
     # AT makes that marker stale; keep its detailed result for later inspection
     # but stop surfacing the authentication failure in the account list.
-    if str(data.get("promotion_status") or "").strip() == "AT失效":
+    stale_at_markers = {"AT失效", "AT hết hiệu lực"}
+    if str(data.get("promotion_status") or "").strip() in stale_at_markers:
         data["promotion_status"] = ""
     promotion = data.get("promotion") if isinstance(data.get("promotion"), dict) else {}
-    if str(promotion.get("status") or "").strip() == "AT失效":
+    if str(promotion.get("status") or "").strip() in stale_at_markers:
         promotion["status"] = ""
         data["promotion"] = promotion
     account_scan = data.get("account_scan") if isinstance(data.get("account_scan"), dict) else {}
@@ -739,8 +740,8 @@ def _mark_successful_relogin(data: dict[str, Any], probe: dict[str, Any], *, now
     # even though the newly persisted token has passed the canonical probe.
     quota = data.get("quota") if isinstance(data.get("quota"), dict) else {}
     quota_status = str(probe.get("quota_status") or "").strip()
-    if not quota_status or quota_status in {"401失效", "token_invalid", "HTTP 401"}:
-        quota_status = "可用"
+    if not quota_status or quota_status in {"401失效", "401 hết hiệu lực", "token_invalid", "HTTP 401"}:
+        quota_status = "Dùng được"
     quota["status"] = quota_status
     quota["updated_at"] = timestamp
     quota["last_result"] = {

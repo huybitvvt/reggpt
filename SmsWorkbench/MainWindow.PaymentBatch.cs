@@ -20,8 +20,8 @@ namespace SmsWorkbench
             {
                 MessageBox.Show(
                     this,
-                    "已有后端任务正在运行，请先等待其完成或取消后再发起批量支付。",
-                    "任务进行中",
+                    "Đang có tác vụ backend chạy. Vui lòng đợi hoàn tất hoặc hủy trước khi bắt đầu thanh toán hàng loạt.",
+                    "Tác vụ đang chạy",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;

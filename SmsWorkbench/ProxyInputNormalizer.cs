@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -69,7 +69,7 @@ namespace SmsWorkbench
                 return scheme + "://" + remainder;
             }
 
-            throw new FormatException("代理格式应为 host:port、host:port:user:password 或带 http/https/socks5/socks5h 前缀的 URL。");
+            throw new FormatException("Định dạng proxy phải là host:port, host:port:user:password hoặc URL có tiền tố http/https/socks5/socks5h.");
         }
 
         public static string[] NormalizeList(string value, string defaultScheme = "http")
@@ -114,7 +114,7 @@ namespace SmsWorkbench
         private static string NormalizeUrlForm(string scheme, string remainder)
         {
             if (!Uri.TryCreate(scheme + "://" + remainder, UriKind.Absolute, out Uri uri) || uri.Port <= 0)
-                throw new FormatException("代理 URL 无效或缺少端口。");
+                throw new FormatException("URL proxy không hợp lệ hoặc thiếu port.");
             string userInfo = uri.UserInfo;
             if (userInfo.Length == 0)
                 return BuildUrl(scheme, uri.Host, uri.Port, "", "");
@@ -130,7 +130,7 @@ namespace SmsWorkbench
         private static string BuildUrl(string scheme, string host, int port, string username, string password)
         {
             if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
-                throw new FormatException("代理主机或端口无效。");
+                throw new FormatException("Host hoặc port proxy không hợp lệ.");
             string endpoint = host.Contains(':', StringComparison.Ordinal) ? "[" + host.Trim('[', ']') + "]" : host;
             if (username.Length == 0 && password.Length == 0)
                 return $"{scheme}://{endpoint}:{port}";
@@ -146,7 +146,7 @@ namespace SmsWorkbench
             if (normalized == "socks") normalized = "socks5";
             if (!SupportedSchemes.Contains(normalized, StringComparer.Ordinal))
                 throw new FormatException(
-                    $"代理协议「{scheme}」不支持，仅接受 http、https、socks5 或 socks5h。");
+                    $"Giao thức proxy \"{scheme}\" không hỗ trợ, chỉ nhận http, https, socks5 hoặc socks5h.");
             return normalized;
         }
 

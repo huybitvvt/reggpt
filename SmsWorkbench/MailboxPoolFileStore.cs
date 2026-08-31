@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -52,7 +52,7 @@ namespace SmsWorkbench
         internal static bool IsMailboxPoolLike(string accountType, string mailboxProvider)
         {
             string type = accountType ?? "";
-            return type.Contains("邮箱池", StringComparison.OrdinalIgnoreCase)
+            return type.Contains("Pool email", StringComparison.OrdinalIgnoreCase)
                 || type.Contains("Chatai", StringComparison.OrdinalIgnoreCase)
                 || !string.IsNullOrWhiteSpace(mailboxProvider);
         }

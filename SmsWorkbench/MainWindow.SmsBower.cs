@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 
 namespace SmsWorkbench
 {
@@ -9,7 +9,7 @@ namespace SmsWorkbench
             string apiKey = ResolveSmsBowerApiKey(settingsService.GetString("phone_reuse.smsbower.api_key"));
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                ShowThemedInfoDialog("SMSBower 未配置", "请先在设置的手机接码分类中填写 SMSBower API Key。");
+                ShowThemedInfoDialog("SMSBower chưa cấu hình", "Vui lòng điền SMSBower API Key trong mục nhận mã điện thoại của Cài đặt.");
                 return false;
             }
 
@@ -32,7 +32,7 @@ namespace SmsWorkbench
             catch (Exception exc)
             {
                 logger?.Error(exc, "Failed to load SMSBower OpenAI catalog");
-                ShowThemedInfoDialog("SMSBower 加载失败", "无法读取 OpenAI 号码地区和价格档位：" + exc.Message);
+                ShowThemedInfoDialog("Tải SMSBower thất bại", "Không thể đọc khu vực số OpenAI và gói giá: " + exc.Message);
                 return false;
             }
             finally
@@ -42,7 +42,7 @@ namespace SmsWorkbench
 
             if (countries.Count == 0)
             {
-                ShowThemedInfoDialog("暂无号码", "SMSBower 当前没有可用的 OpenAI 号码。");
+                ShowThemedInfoDialog("Chưa có số", "SMSBower hiện không có số OpenAI khả dụng.");
                 return false;
             }
 
@@ -57,7 +57,7 @@ namespace SmsWorkbench
 
             var dialog = new Window
             {
-                Title = "一键接码",
+                Title = "Nhận mã nhanh",
                 Owner = this,
                 Width = Math.Min(620, SystemParameters.WorkArea.Width - 60),
                 Height = 420,
@@ -82,7 +82,7 @@ namespace SmsWorkbench
             };
             var heading = new TextBlock
             {
-                Text = "选择 SMSBower 号码",
+                Text = "Chọn số SMSBower",
                 FontSize = 20,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = (Brush)FindResource("TextMain"),
@@ -90,7 +90,7 @@ namespace SmsWorkbench
             };
             var balanceText = new TextBlock
             {
-                Text = "当前平台余额：$" + balance,
+                Text = "Số dư nền tảng hiện tại: $" + balance,
                 FontSize = 13,
                 Foreground = (Brush)FindResource("TextSub")
             };
@@ -99,7 +99,7 @@ namespace SmsWorkbench
             Grid.SetRow(headingPanel, 0);
             root.Children.Add(headingPanel);
 
-            var servicePanel = CreateSmsBowerDialogRow("服务商", out ContentControl serviceHost);
+            var servicePanel = CreateSmsBowerDialogRow("Nhà cung cấp", out ContentControl serviceHost);
             serviceHost.Content = new TextBlock
             {
                 Text = "OpenAI (ChatGPT)",
@@ -111,7 +111,7 @@ namespace SmsWorkbench
             Grid.SetRow(servicePanel, 1);
             root.Children.Add(servicePanel);
 
-            var countryPanel = CreateSmsBowerDialogRow("国家或地区", out ContentControl countryHost);
+            var countryPanel = CreateSmsBowerDialogRow("Quốc gia hoặc khu vực", out ContentControl countryHost);
             var countryBox = new ComboBox
             {
                 ItemsSource = countries,
@@ -126,7 +126,7 @@ namespace SmsWorkbench
             Grid.SetRow(countryPanel, 2);
             root.Children.Add(countryPanel);
 
-            var tierPanel = CreateSmsBowerDialogRow("号码档位", out ContentControl tierHost);
+            var tierPanel = CreateSmsBowerDialogRow("Gói số điện thoại", out ContentControl tierHost);
             var tierBox = new ComboBox
             {
                 ItemsSource = selectedCountry.Tiers,
@@ -154,7 +154,7 @@ namespace SmsWorkbench
             {
                 if (tierBox.SelectedItem is SmsBowerPriceTier tier)
                 {
-                    inventory.Text = $"当前库存 {tier.Count} 个，价格 ${tier.Price} / 个";
+                    inventory.Text = $"Tồn kho hiện tại {tier.Count} số, giá ${tier.Price} / số";
                 }
                 else
                 {
@@ -180,7 +180,7 @@ namespace SmsWorkbench
             };
             var cancel = new Button
             {
-                Content = "取消",
+                Content = "Hủy",
                 MinWidth = 88,
                 Height = 36,
                 Margin = new Thickness(0, 0, 10, 0),
@@ -188,7 +188,7 @@ namespace SmsWorkbench
             };
             var start = new Button
             {
-                Content = "开始接码",
+                Content = "Bắt đầu nhận mã",
                 MinWidth = 104,
                 Height = 36,
                 IsDefault = true

@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -8,7 +8,7 @@ namespace SmsWorkbench
         private void ShowConfigDialog()
         {
             if (settingsDialogs.ShowDialog(this))
-                Log("配置已保存。");
+                Log("Đã lưu cấu hình.");
         }
     }
 }

@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Expr = System.Linq.Expressions.Expression;
 
 namespace SmsWorkbench
@@ -11,25 +11,32 @@ namespace SmsWorkbench
             if (status.Length == 0) return "neutral";
 
             if (PromotionStatusPresentation.IsTrialEligible(status)
-                || status.Contains('✅') || status.Contains("完成") || status.Contains("已注册")
-                || status.Contains("已获取") || status.Contains("已导入") || status.Contains("K12已进入")
-                || status.Contains("PM已创建") || status.Contains("已设置"))
+                || status.Contains('✅') || Has(status, "Hoàn tất", "\u5b8c\u6210")
+                || Has(status, "Đã đăng ký", "\u5df2\u6ce8\u518c")
+                || Has(status, "Đã lấy", "\u5df2\u83b7\u53d6")
+                || Has(status, "Đã nhập", "\u5df2\u5bfc\u5165")
+                || Has(status, "K12 đã vào", "PM đã tạo", "Đã thiết lập"))
                 return "success";
 
-            if (status.Contains("失败") || status.Contains("失效") || status.Contains("掉号")
-                || status.Contains("异常") || status.Contains("无RT") || status.Contains("缺失")
-                || status.Contains("未获取") || status.Contains("K12未切换") || status.Contains("K12已退出"))
+            if (Has(status, "Thất bại", "\u5931\u8d25")
+                || Has(status, "hết hiệu lực", "\u5931\u6548")
+                || Has(status, "Bị vô hiệu", "\u6389\u53f7", "\u505c\u7528")
+                || Has(status, "Lỗi", "\u5f02\u5e38")
+                || Has(status, "Không có RT", "Thiếu", "Chưa lấy", "K12 chưa chuyển", "K12 đã thoát"))
                 return "danger";
 
-            if (status.Contains('待') || status.Contains('缺') || status.Contains("OTP")
-                || status.Contains("K12已申请") || status.Contains("旧token"))
+            if (Has(status, "Chờ", "chờ", "\u5f85", "Thiếu", "thiếu", "\u7f3a", "OTP")
+                || Has(status, "K12 đã yêu cầu", "token cũ"))
                 return "warn";
 
-            if (status.Contains("已保存") || status.Contains("待刷新") || status.Contains("未知"))
+            if (Has(status, "Đã lưu", "Chờ làm mới", "Không rõ", "\u672a\u77e5"))
                 return "info";
 
             return "neutral";
         }
+
+        private static bool Has(string text, params string[] values)
+            => values.Any(value => text.Contains(value, StringComparison.OrdinalIgnoreCase));
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -43,7 +50,8 @@ namespace SmsWorkbench
         {
             string value = (status ?? "").Trim();
             if (value.Length == 0) return false;
-            return value.Contains("可试用", StringComparison.OrdinalIgnoreCase)
+            return (value.Contains("có dùng thử", StringComparison.OrdinalIgnoreCase)
+                    || value.Contains("\u53ef\u8bd5\u7528", StringComparison.OrdinalIgnoreCase))
                 && value.Contains("plus", StringComparison.OrdinalIgnoreCase);
         }
 

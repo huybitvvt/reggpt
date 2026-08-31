@@ -1,4 +1,4 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     /// <summary>
     /// Window-independent interpretation of backend account JSON: plan type,
@@ -69,8 +69,8 @@ namespace SmsWorkbench
             string remaining = BackendJson.FirstNonEmpty(BackendJson.NestedString(data, "quota", "remaining"), BackendJson.NestedString(data, "usage", "remaining"));
             string limit = BackendJson.FirstNonEmpty(BackendJson.NestedString(data, "quota", "limit"), BackendJson.NestedString(data, "usage", "limit"));
             if (remaining.Length > 0 || limit.Length > 0) return remaining + (limit.Length > 0 ? "/" + limit : "");
-            if (BackendJson.GetString(data, "access_token").Trim().Length > 0) return "待刷新";
-            return "未知";
+            if (BackendJson.GetString(data, "access_token").Trim().Length > 0) return "Chờ làm mới";
+            return "Không rõ";
         }
 
         public static string GetAccessTokenProbeStatusCode(Dictionary<string, object> data)
@@ -227,27 +227,27 @@ namespace SmsWorkbench
             bool hasRt = refreshTokenStatus.Equals("oauth_present", StringComparison.OrdinalIgnoreCase)
                 || refreshTokenStatus.Equals("legacy_present", StringComparison.OrdinalIgnoreCase);
             if (status.Equals("account_deactivated", StringComparison.OrdinalIgnoreCase)
-                || LooksAccountDeactivatedError(error)) return "账号掉号";
-            if (hasRt && LooksPhoneVerificationError(error)) return "手机验证";
+                || LooksAccountDeactivatedError(error)) return "Tài khoản bị vô hiệu";
+            if (hasRt && LooksPhoneVerificationError(error)) return "Xác minh điện thoại";
             if (status.Equals("at_invalid", StringComparison.OrdinalIgnoreCase)
                 || status.Equals("access_token_invalid", StringComparison.OrdinalIgnoreCase)
                 || status.Equals("token_invalidated", StringComparison.OrdinalIgnoreCase)
-                || LooksAtInvalidError(error)) return "AT失效";
-            if (status.Equals("k12_left", StringComparison.OrdinalIgnoreCase)) return "K12已退出";
-            if (status.Equals("k12_joined", StringComparison.OrdinalIgnoreCase)) return "K12已进入✅";
-            if (status.Equals("k12_requested", StringComparison.OrdinalIgnoreCase)) return "K12已申请";
-            if (status.Equals("k12_verify_failed", StringComparison.OrdinalIgnoreCase)) return "K12未切换";
-            if (paypalStatus.Equals("completed", StringComparison.OrdinalIgnoreCase)) return "支付完成✅";
+                || LooksAtInvalidError(error)) return "AT hết hiệu lực";
+            if (status.Equals("k12_left", StringComparison.OrdinalIgnoreCase)) return "K12 đã thoát";
+            if (status.Equals("k12_joined", StringComparison.OrdinalIgnoreCase)) return "K12 đã vào✅";
+            if (status.Equals("k12_requested", StringComparison.OrdinalIgnoreCase)) return "K12 đã yêu cầu";
+            if (status.Equals("k12_verify_failed", StringComparison.OrdinalIgnoreCase)) return "K12 chưa chuyển";
+            if (paypalStatus.Equals("completed", StringComparison.OrdinalIgnoreCase)) return "Thanh toán hoàn tất✅";
             if (paypalStatus.Equals("pm_created", StringComparison.OrdinalIgnoreCase)
-                || status.Equals("paypal_pm_created", StringComparison.OrdinalIgnoreCase)) return "PM已创建✅";
-            if (status.Equals("paypal_failed", StringComparison.OrdinalIgnoreCase) || paypalStatus.Equals("failed", StringComparison.OrdinalIgnoreCase)) return "支付链接失败";
+                || status.Equals("paypal_pm_created", StringComparison.OrdinalIgnoreCase)) return "PM đã tạo✅";
+            if (status.Equals("paypal_failed", StringComparison.OrdinalIgnoreCase) || paypalStatus.Equals("failed", StringComparison.OrdinalIgnoreCase)) return "Tạo link thanh toán thất bại";
             if (paypalStatus.Equals("manual_confirmation_required", StringComparison.OrdinalIgnoreCase)
                 || paypalStatus.Equals("link_ready", StringComparison.OrdinalIgnoreCase)
                 || paypalOk == "1"
-                || status.Equals("paypal_ready", StringComparison.OrdinalIgnoreCase)) return "待支付";
-            if (hasRt && access.Length > 0) return "已注册";
-            if (!string.IsNullOrWhiteSpace(error) || status.Equals("failed", StringComparison.OrdinalIgnoreCase)) return "失败";
-            return access.Length > 0 ? "已注册" : "待处理";
+                || status.Equals("paypal_ready", StringComparison.OrdinalIgnoreCase)) return "Chờ thanh toán";
+            if (hasRt && access.Length > 0) return "Đã đăng ký";
+            if (!string.IsNullOrWhiteSpace(error) || status.Equals("failed", StringComparison.OrdinalIgnoreCase)) return "Thất bại";
+            return access.Length > 0 ? "Đã đăng ký" : "Chờ xử lý";
         }
 
         public static bool LooksAtInvalidError(string error)
@@ -282,10 +282,10 @@ namespace SmsWorkbench
         public static string DisplayPayPalStatus(string paypalStatus, string paypalOk, string paypalUrl, string paymentMethod = "")
         {
             string prefix = PaymentMethods.Normalize(paymentMethod) == "paypal" ? "" : PaymentMethods.DisplayName(paymentMethod) + " ";
-            if (paypalStatus.Equals("completed", StringComparison.OrdinalIgnoreCase)) return prefix + "支付完成✅";
-            if (paypalStatus.Equals("pm_created", StringComparison.OrdinalIgnoreCase)) return prefix + "PM已创建✅";
-            if (paypalStatus.Equals("failed", StringComparison.OrdinalIgnoreCase)) return prefix + "支付失败";
-            if (paypalStatus.Equals("otp_required", StringComparison.OrdinalIgnoreCase)) return prefix + "待输入OTP";
+            if (paypalStatus.Equals("completed", StringComparison.OrdinalIgnoreCase)) return prefix + "Thanh toán hoàn tất✅";
+            if (paypalStatus.Equals("pm_created", StringComparison.OrdinalIgnoreCase)) return prefix + "PM đã tạo✅";
+            if (paypalStatus.Equals("failed", StringComparison.OrdinalIgnoreCase)) return prefix + "Thanh toán thất bại";
+            if (paypalStatus.Equals("otp_required", StringComparison.OrdinalIgnoreCase)) return prefix + "Chờ nhập OTP";
             if (paypalStatus.Equals("manual_confirmation_required", StringComparison.OrdinalIgnoreCase)) return PaymentPendingStatus(paymentMethod);
             if (paypalStatus.Equals("link_ready", StringComparison.OrdinalIgnoreCase)) return PaymentPendingStatus(paymentMethod);
             if (paypalOk == "1" && !string.IsNullOrWhiteSpace(paypalUrl)) return PaymentPendingStatus(paymentMethod);
@@ -295,11 +295,11 @@ namespace SmsWorkbench
 
         public static string PaymentPendingStatus(string paymentMethod)
         {
-            return PaymentMethods.DisplayName(paymentMethod) + "待支付";
+            return PaymentMethods.DisplayName(paymentMethod) + "Chờ thanh toán";
         }
 
         /// <summary>
-        /// Unified 优惠状态 shown after merging the former 支付状态 + 支付金额 columns.
+        /// Unified Trạng thái ưu đãi shown after merging the former Thanh toánTrạng thái + Số tiền thanh toán columns.
         /// Prefers the account plan/promotion probe (accounts/check) result; when it
         /// has not been run, falls back to the payment link status combined with its
         /// amount so no information from the old two columns is lost.
@@ -320,8 +320,8 @@ namespace SmsWorkbench
             string value = (refreshTokenStatus ?? "").Trim();
             return value.Equals("oauth_present", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("legacy_present", StringComparison.OrdinalIgnoreCase)
-                ? "已获取"
-                : "未获取";
+                ? "Đã lấy"
+                : "Chưa lấy";
         }
 
         public static string GetImportedStatus(string rawJson)
@@ -341,9 +341,9 @@ namespace SmsWorkbench
         {
             bool cpaImported = IsImportOk(data, "cpa_import");
             bool sub2Imported = IsImportOk(data, "sub2api_import");
-            if (cpaImported && sub2Imported) return "已导入CPA/SUB2";
-            if (cpaImported) return "已导入CPA";
-            if (sub2Imported) return "已导入SUB2";
+            if (cpaImported && sub2Imported) return "Đã nhập CPA/SUB2";
+            if (cpaImported) return "Đã nhập CPA";
+            if (sub2Imported) return "Đã nhập SUB2";
             return "";
         }
 

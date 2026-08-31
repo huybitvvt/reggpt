@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -8,7 +8,7 @@ namespace SmsWorkbench
     public sealed partial class PaymentBatchViewModel : ObservableObject
     {
         private static readonly PaymentProxyCountryOption AutomaticCheckoutCountryOption =
-            new("", "自动（跟随账单区）");
+            new("", "Tự động (theo vùng billing)");
         private static readonly char[] ManualTokenSeparators = ['\r', '\n', ',', ';'];
 
         private readonly IPaymentBatchService _paymentBatchService;
@@ -38,13 +38,13 @@ namespace SmsWorkbench
         [ObservableProperty] private string approveProxyPool = "";
         [ObservableProperty] private string checkoutProxyCountry = "";
         [ObservableProperty] private string approveProxyCountry = "";
-        // Region composition of the current mixed source pool (e.g. "US×30 · JP×30 · GB×30 · 未知×0").
+        // Region composition of the current mixed source pool (e.g. "US×30 · JP×30 · GB×30 · Không rõ×0").
         [ObservableProperty] private string checkoutRegionSummary = "";
         [ObservableProperty] private string approveRegionSummary = "";
         [ObservableProperty] private bool jitRefresh = true;
         [ObservableProperty] private bool probeOnly;
         [ObservableProperty] private bool requireZero = true;
-        [ObservableProperty] private string status = "就绪";
+        [ObservableProperty] private string status = "Sẵn sàng";
         [ObservableProperty] private string reportPath = "";
         [ObservableProperty] private bool isRunning;
         [ObservableProperty] private bool hasRun;
@@ -96,8 +96,8 @@ namespace SmsWorkbench
         public ObservableCollection<PaymentBatchResultRow> Results { get; } = new();
 
         public string AccountSummary => _accounts.Length > 0
-            ? $"账号 {_accounts.Length}  ·  AT 已获取 {_accounts.Count(account => account.HasAccessToken)}"
-            : $"手动 AT {ParseManualAccessTokens().Length} / 10";
+            ? $"Tài khoản {_accounts.Length}  ·  AT Đã lấy {_accounts.Count(account => account.HasAccessToken)}"
+            : $"AT thủ công {ParseManualAccessTokens().Length} / 10";
 
         public bool RequireZeroEnabled => !ProbeOnly;
         public bool IsPayPalSelected => string.Equals(SelectedMethod?.Id, "paypal", StringComparison.OrdinalIgnoreCase);
@@ -114,8 +114,8 @@ namespace SmsWorkbench
         }
 
         public string ExecutionModeSummary => ResumeCheckpoint
-            ? "断点恢复（复用当前批次 ID）"
-            : "新执行（每次生成新批次 ID）";
+            ? "Khôi phục checkpoint (dùng lại ID batch hiện tại)"
+            : "Chạy mới (mỗi lần tạo ID batch mới)";
 
         partial void OnManualAccessTokensChanged(string value)
         {
@@ -165,11 +165,11 @@ namespace SmsWorkbench
             try
             {
                 Clipboard.SetText(row.ResultValue);
-                Status = $"已复制{row.ResultKind}：{row.AccountRef}";
+                Status = $"Đã sao chép {row.ResultKind}: {row.AccountRef}";
             }
             catch (Exception exception)
             {
-                Status = "复制失败：" + exception.Message;
+                Status = "Sao chép thất bại: " + exception.Message;
             }
         }
 
@@ -190,7 +190,7 @@ namespace SmsWorkbench
                     FullPool(_checkoutRegionPools, _checkoutRegionOrder),
                     FullPool(_approveRegionPools, _approveRegionOrder)));
             Status = result.Ok
-                ? $"{PaymentMethods.DisplayName(method)} Checkout / Approve 代理配置已保存。"
+                ? $"{PaymentMethods.DisplayName(method)} Checkout / Approve Đã lưu cấu hình proxy."
                 : result.Error;
         }
 
@@ -198,7 +198,7 @@ namespace SmsWorkbench
         private async Task TestProxiesAsync(CancellationToken cancellationToken)
         {
             string method = SelectedMethod?.Id ?? "paypal";
-            Status = "正在探测 Checkout / Approve 代理出口...";
+            Status = "Đang kiểm tra exit proxy Checkout / Approve...";
             IsRunning = true;
             try
             {
@@ -213,15 +213,15 @@ namespace SmsWorkbench
             }
             catch (OperationCanceledException)
             {
-                Status = "代理探测已取消。";
+                Status = "Đã hủy kiểm tra proxy.";
             }
             catch (TimeoutException)
             {
-                Status = "代理探测超时。";
+                Status = "Kiểm tra proxy timeout.";
             }
             catch (Exception exception)
             {
-                Status = "代理探测失败：" + exception.Message;
+                Status = "Kiểm tra proxy thất bại: " + exception.Message;
             }
             finally
             {
@@ -252,8 +252,8 @@ namespace SmsWorkbench
                         : $"{stage.Name}✗ {error}".Trim());
                 }
             }
-            string prefix = ok ? "代理探测通过：" : "代理探测存在问题：";
-            return parts.Count > 0 ? prefix + string.Join("  |  ", parts) : prefix + "无可探测的代理";
+            string prefix = ok ? "Kiểm tra proxy đạt: " : "Kiểm tra proxy có vấn đề: ";
+            return parts.Count > 0 ? prefix + string.Join("  |  ", parts) : prefix + "Không có proxy để kiểm tra";
         }
 
         [RelayCommand(IncludeCancelCommand = true, CanExecute = nameof(CanRun))]
@@ -268,15 +268,15 @@ namespace SmsWorkbench
                 Results.Add(new PaymentBatchResultRow
                 {
                     AccountRef = account.Email,
-                    CurrentStage = "等待",
+                    CurrentStage = "Đang chờ",
                     ProgressText = "0%",
-                    ResultStatus = "等待",
+                    ResultStatus = "Đang chờ",
                 });
             }
             ReportPath = "";
             Status = ProbeOnly
-                ? "正在执行 Checkout 与 Stripe init 支付能力探测..."
-                : "正在执行 JIT 探测与协议支付批次...";
+                ? "Đang chạy kiểm tra khả năng thanh toán Checkout và Stripe init..."
+                : "Đang chạy kiểm tra JIT và batch thanh toán giao thức...";
             IsRunning = true;
             try
             {
@@ -291,28 +291,28 @@ namespace SmsWorkbench
                 ReportPath = JsonString(report, "report_path");
                 string error = JsonString(report, "error");
                 string summary = error.Length > 0 && !report.TryGetProperty("counts", out _)
-                    ? "执行失败：" + error
+                    ? "Chạy thất bại: " + error
                     : FormatSummary(report);
                 int resumed = JsonInt(report, "resumed");
                 Status = request.ResumeCheckpoint
-                    ? $"断点恢复 · 已恢复 {resumed} 个账号 · {summary}"
-                    : "新执行 · " + summary;
+                    ? $"Khôi phục checkpoint · đã khôi phục {resumed} tài khoản · {summary}"
+                    : "Chạy mới · " + summary;
             }
             catch (OperationCanceledException)
             {
                 Status = request.ProbeOnly
-                    ? "已取消。"
-                    : "结果未知，请先核对批次断点和支付服务状态，不要重试。";
+                    ? "Đã hủy."
+                    : "Kết quả không rõ, vui lòng kiểm tra checkpoint batch và trạng thái dịch vụ thanh toán, không thử lại.";
             }
             catch (TimeoutException)
             {
                 Status = request.ProbeOnly
-                    ? "能力探测已超时，可按策略重试。"
-                    : "结果未知，请先核对批次断点和支付服务状态，不要重试。";
+                    ? "Kiểm tra khả năng đã timeout, có thể thử lại theo chiến lược."
+                    : "Kết quả không rõ, vui lòng kiểm tra checkpoint batch và trạng thái dịch vụ thanh toán, không thử lại.";
             }
             catch (Exception exception)
             {
-                Status = "执行失败：" + exception.Message;
+                Status = "Chạy thất bại: " + exception.Message;
             }
             finally
             {
@@ -326,7 +326,7 @@ namespace SmsWorkbench
             request = null;
             if (!int.TryParse(CanaryText.Trim(), out int canary) || canary < 0)
             {
-                Status = "Canary 数量必须是非负整数。";
+                Status = "Số lượng canary phải là số nguyên không âm.";
                 return false;
             }
             string normalizedBatchId = ResumeCheckpoint
@@ -338,7 +338,7 @@ namespace SmsWorkbench
             if (accounts.Length == 0)
             {
                 if (ParseManualAccessTokens().Length <= 10)
-                    Status = "请选择账号，或输入 1 至 10 个 Access Token。";
+                    Status = "Vui lòng chọn tài khoản hoặc nhập 1 đến 10 Access Token.";
                 return false;
             }
             request = new PaymentBatchRequest(
@@ -369,7 +369,7 @@ namespace SmsWorkbench
             string[] tokens = ParseManualAccessTokens();
             if (tokens.Length > 10)
             {
-                Status = "手动 Access Token 最多允许 10 个。";
+                Status = "Access Token thủ công tối đa 10 token.";
                 return Array.Empty<PaymentBatchAccount>();
             }
             return tokens.Select((token, index) => new PaymentBatchAccount($"AT-{index + 1}", true, token)).ToArray();
@@ -392,7 +392,7 @@ namespace SmsWorkbench
             bool accountTerminal = progress.AccountTerminal;
             // Backend events can arrive out of order when adapter callbacks and
             // the executor's terminal event share stdout. Never let a stale
-            // running event regress a terminal row back to "执行中".
+            // running event regress a terminal row back to "Đang chạy".
             if (_terminalProgressAccounts.Contains(row.AccountRef)
                 && !accountTerminal)
                 return;
@@ -410,8 +410,8 @@ namespace SmsWorkbench
                 row.ProgressText = "100%";
             }
             row.ResultStatus = accountTerminal
-                ? progress.Status.Equals("completed", StringComparison.OrdinalIgnoreCase) ? "成功" : "失败"
-                : "执行中";
+                ? progress.Status.Equals("completed", StringComparison.OrdinalIgnoreCase) ? "Thành công" : "Thất bại"
+                : "Đang chạy";
             Status = $"{accountRef}  {row.CurrentStage}  {row.ProgressText}";
         }
 
@@ -451,15 +451,15 @@ namespace SmsWorkbench
 
         private static string PaymentStageLabel(string stage) => (stage ?? "").Trim().ToLowerInvariant() switch
         {
-            "routing" => "路由准备",
-            "auth_gate" => "AT 验证",
-            "checkout" or "checkout_create" => "创建 Checkout",
-            "stripe_init" or "capability_probe" => "能力探测",
-            "provider" or "payment_method" => "支付方式处理",
-            "approve" or "confirm" => "支付确认",
-            "redirect" or "promotion" => "结果确认",
-            "completed" => "完成",
-            _ => string.IsNullOrWhiteSpace(stage) ? "执行中" : stage,
+            "routing" => "Chuẩn bị định tuyến",
+            "auth_gate" => "Xác minh AT",
+            "checkout" or "checkout_create" => "Tạo Checkout",
+            "stripe_init" or "capability_probe" => "Kiểm tra khả năng",
+            "provider" or "payment_method" => "Xử lý phương thức thanh toán",
+            "approve" or "confirm" => "Thanh toánXác nhận",
+            "redirect" or "promotion" => "Kết quảXác nhận",
+            "completed" => "Hoàn tất",
+            _ => string.IsNullOrWhiteSpace(stage) ? "Đang chạy" : stage,
         };
 
         /// <summary>
@@ -556,7 +556,7 @@ namespace SmsWorkbench
         // Cliproxy `region-<CC>` as a secondary hint).  The full mixed pool is
         // preserved as the source so switching back never drops a zone, and the
         // backend still rotates each chosen entry to the selected country at
-        // runtime — the 测试出口 probe validates the resulting egress.
+        // runtime — the Kiểm tra exit probe validates the resulting egress.
 
         private static string InferProxyRegion(string proxy)
         {
@@ -614,7 +614,7 @@ namespace SmsWorkbench
         {
             if (string.IsNullOrWhiteSpace(country))
             {
-                // Automatic / 自动: the display holds every region, so re-derive
+                // Automatic: the display holds every region, so re-derive
                 // all buckets from it.
                 InitializeBuckets(display, buckets, order);
                 return;
@@ -680,9 +680,9 @@ namespace SmsWorkbench
 
         private static string FormatRegionSummary(Dictionary<string, List<string>> buckets, List<string> order)
         {
-            if (buckets.Count == 0) return "（空）";
+            if (buckets.Count == 0) return "(trống)";
             return string.Join(" · ", order.Select(region =>
-                (region.Length == 0 ? "未知" : region) + "×" + buckets[region].Count));
+                (region.Length == 0 ? "Không rõ" : region) + "×" + buckets[region].Count));
         }
 
         private void RefreshRegionSummaries()
@@ -724,10 +724,10 @@ namespace SmsWorkbench
             if (!report.TryGetProperty("results", out JsonElement values) || values.ValueKind != JsonValueKind.Array) return;
             foreach (JsonElement row in values.EnumerateArray())
             {
-                string eligibility = "未知";
+                string eligibility = "Không rõ";
                 if (row.TryGetProperty("eligible", out JsonElement eligible)
                     && eligible.ValueKind is JsonValueKind.True or JsonValueKind.False)
-                    eligibility = eligible.GetBoolean() ? "符合" : "不符合";
+                    eligibility = eligible.GetBoolean() ? "Đạt" : "Không đạt";
                 string decision = JsonString(row, "decision");
                 string paymentUrl = FirstNonEmpty(JsonString(row, "url"), JsonString(row, "long_url"));
                 string qrData = JsonString(row, "qr_data");
@@ -744,17 +744,17 @@ namespace SmsWorkbench
                 if (terminalState.Equals("canceled", StringComparison.OrdinalIgnoreCase))
                     terminalState = "cancelled";
                 string resultKind = paymentUrlPresent
-                    ? "支付链接"
+                    ? "Thanh toánLink"
                     : qrDataPresent
-                        ? "二维码内容"
-                        : qrPathPresent ? "二维码文件" : "";
+                        ? "Nội dung mã QR"
+                        : qrPathPresent ? "File mã QR" : "";
                 string resultValue = FirstNonEmpty(paymentUrl, qrData, qrPath);
                 Results.Add(new PaymentBatchResultRow
                 {
                     AccountRef = ResolveAccountDisplay(JsonString(row, "account_ref")),
                     MatrixCell = JsonString(row, "matrix_cell"),
-                    AuthStatus = JsonBool(row, "authenticated") ? "200" : "失败",
-                    RefreshStatus = JsonBool(row, "refreshed") ? "已刷新" : "未刷新",
+                    AuthStatus = JsonBool(row, "authenticated") ? "200" : "Thất bại",
+                    RefreshStatus = JsonBool(row, "refreshed") ? "Đã làm mới" : "Chưa làm mới",
                     Eligibility = eligibility,
                     Decision = decision.Length > 0 ? decision : JsonString(row, "error"),
                     TerminalState = terminalState,
@@ -767,12 +767,12 @@ namespace SmsWorkbench
                     AuthorizationStatus = JsonString(row, "authorization_status"),
                     ProgressPercent = 100,
                     ProgressText = "100%",
-                    CurrentStage = "完成",
+                    CurrentStage = "Hoàn tất",
                     ResultStatus = JsonBool(row, "ok")
                         || terminalState.Equals("completed", StringComparison.OrdinalIgnoreCase)
                         || paymentUrlPresent || qrDataPresent || qrPathPresent
-                        ? "成功"
-                        : "失败",
+                        ? "Thành công"
+                        : "Thất bại",
                     Attempts = JsonInt(row, "attempts")
                 });
             }
@@ -781,14 +781,14 @@ namespace SmsWorkbench
         private static string FormatSummary(JsonElement report)
         {
             if (!report.TryGetProperty("counts", out JsonElement counts) || counts.ValueKind != JsonValueKind.Object)
-                return "批次已结束，但未返回计数。";
-            return $"请求 {JsonInt(counts, "requested")}  ·  AT 200 {JsonInt(counts, "authenticated")}"
-                + $"  ·  JIT {JsonInt(counts, "refreshed")}  ·  资格 {JsonInt(counts, "eligible")}"
-                + $"  ·  完成 {JsonInt(counts, "completed")}  ·  链接 {JsonInt(counts, "link_ready")}"
-                + $"  ·  二维码 {JsonInt(counts, "qr_ready")}  ·  取消 {JsonInt(counts, "cancelled")}"
-                + $"  ·  未知 {JsonInt(counts, "unknown")}  ·  超时 {JsonInt(counts, "timed_out")}"
-                + $"  ·  失败 {JsonInt(counts, "failed")}  ·  可重试 {JsonInt(counts, "retryable")}"
-                + $"  ·  断点恢复 {JsonInt(report, "resumed")}";
+                return "Batch đã kết thúc nhưng không trả về số liệu.";
+            return $"Yêu cầu {JsonInt(counts, "requested")}  ·  AT 200 {JsonInt(counts, "authenticated")}"
+                + $"  ·  JIT {JsonInt(counts, "refreshed")}  ·  Đủ điều kiện {JsonInt(counts, "eligible")}"
+                + $"  ·  Hoàn tất {JsonInt(counts, "completed")}  ·  Link {JsonInt(counts, "link_ready")}"
+                + $"  ·  Mã QR {JsonInt(counts, "qr_ready")}  ·  Hủy {JsonInt(counts, "cancelled")}"
+                + $"  ·  Không rõ {JsonInt(counts, "unknown")}  ·  Timeout {JsonInt(counts, "timed_out")}"
+                + $"  ·  Thất bại {JsonInt(counts, "failed")}  ·  Có thể thử lại {JsonInt(counts, "retryable")}"
+                + $"  ·  Khôi phục checkpoint {JsonInt(report, "resumed")}";
         }
 
         private static string JsonString(JsonElement element, string name)

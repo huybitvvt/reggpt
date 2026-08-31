@@ -1,15 +1,15 @@
-namespace SmsWorkbench
+﻿namespace SmsWorkbench
 {
     public partial class MainWindow
     {
         // Session refresh, row selection and paging filters
         private void RefreshSession_Click(object sender, RoutedEventArgs e)
         {
-            PoolRow row = SelectedEmailRowOrNotify("刷新 Session");
+            PoolRow row = SelectedEmailRowOrNotify("Làm mới Session");
             if (row == null) return;
             var args = new List<string> { "--email", row.Identifier, "--refresh-session" };
             AddSessionFileArg(args, row);
-            RunBackend("刷新Session", args);
+            RunBackend("Làm mới Session", args);
         }
 
         private void AddSessionFileArg(List<string> args, PoolRow row)
@@ -59,8 +59,8 @@ namespace SmsWorkbench
 
         private void ShowEmailSelectionRequired(string action)
         {
-            string detail = string.IsNullOrWhiteSpace(action) ? "执行此操作" : action.Trim();
-            ShowThemedInfoDialog("未选择邮箱", $"请先勾选或选择邮箱账号后再{detail}。");
+            string detail = string.IsNullOrWhiteSpace(action) ? "thực hiện thao tác này" : action.Trim();
+            ShowThemedInfoDialog("Chưa chọn email", $"Vui lòng tick hoặc chọn tài khoản email trước khi {detail}.");
         }
 
         private List<PoolRow> SelectedRowsOrCurrent()
@@ -100,13 +100,13 @@ namespace SmsWorkbench
             RefreshPagedRows();
         }
 
-        private void ShowAll_Click(object sender, RoutedEventArgs e) => SetScope("全部");
+        private void ShowAll_Click(object sender, RoutedEventArgs e) => SetScope("Tất cả");
 
-        private void ShowMailboxPool_Click(object sender, RoutedEventArgs e) => SetScope("邮箱池");
+        private void ShowMailboxPool_Click(object sender, RoutedEventArgs e) => SetScope("Pool email");
 
-        private void ShowRegistered_Click(object sender, RoutedEventArgs e) => SetScope("已注册");
+        private void ShowRegistered_Click(object sender, RoutedEventArgs e) => SetScope("Đã đăng ký");
 
-        private void ShowPending_Click(object sender, RoutedEventArgs e) => SetScope("待处理");
+        private void ShowPending_Click(object sender, RoutedEventArgs e) => SetScope("Chờ xử lý");
 
         private void FirstPage_Click(object sender, RoutedEventArgs e)
         {

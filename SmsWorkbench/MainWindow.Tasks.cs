@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace SmsWorkbench
 {
@@ -35,7 +35,7 @@ namespace SmsWorkbench
                 BackendCommandResult result = await backendClient.RunAsync(command).ConfigureAwait(true);
                 if (!result.Payload.HasValue)
                 {
-                    Log("[doctor] 环境自检未返回结构化结果(退出码 " + result.ExitCode + ")");
+                    Log("[doctor] Tự kiểm tra môi trường không trả về kết quả có cấu trúc (exit code " + result.ExitCode + ")");
                     return;
                 }
                 var fails = new List<string>();
@@ -52,28 +52,28 @@ namespace SmsWorkbench
                 }
                 if (fails.Count == 0)
                 {
-                    Log($"[doctor] 环境自检通过{(warned > 0 ? $"({warned} 项警告,详见设置与代理配置)" : "")}");
+                    Log($"[doctor] Tự kiểm tra môi trường đạt{(warned > 0 ? $"({warned} cảnh báo, xem chi tiết trong cài đặt và cấu hình proxy)" : "")}");
                     return;
                 }
                 var detail = string.Join("\n  - ", fails);
-                Log("[doctor] 环境自检发现 " + fails.Count + " 项缺失依赖");
+                Log("[doctor] Tự kiểm tra môi trường phát hiện " + fails.Count + " dependency bị thiếu");
                 MessageBox.Show(
                     this,
-                    $"环境自检发现 {fails.Count} 项必需依赖缺失:\n  - {detail}\n\n" +
-                    "可先运行: python -m pip install -r requirements.txt\n" +
-                    "或使用命令 python chatgpt_phone_reg.py --doctor 查看完整报告。",
-                    "环境自检",
+                    $"Tự kiểm tra môi trường phát hiện {fails.Count} dependency bắt buộc bị thiếu:\n  - {detail}\n\n" +
+                    "Có thể chạy trước: python -m pip install -r requirements.txt\n" +
+                    "hoặc dùng lệnh python chatgpt_phone_reg.py --doctor để xem báo cáo đầy đủ.",
+                    "Tự kiểm tra môi trường",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
-                Log("[doctor] 环境自检失败: " + ex.Message);
+                Log("[doctor] Tự kiểm tra môi trường thất bại: " + ex.Message);
                 MessageBox.Show(
                     this,
-                    ex.Message + "\n\n桌面端依赖 Python 3.10+ 与 requirements.txt 中的依赖包。" +
-                    "\n安装后在 设置 → 数据与文件 → 运行环境 配置解释器路径,再重启本程序。",
-                    "无法启动 Python 后端",
+                    ex.Message + "\n\nỨng dụng desktop phụ thuộc Python 3.10+ và các dependency trong requirements.txt." +
+                    "\nSau khi cài, cấu hình đường dẫn interpreter trong Cài đặt → Dữ liệu và file → Môi trường chạy, rồi khởi động lại chương trình.",
+                    "Không thể khởi động backend Python",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -82,22 +82,23 @@ namespace SmsWorkbench
         private void RerunFailed_Click(object sender, RoutedEventArgs e)
         {
             var failedRows = allRows.Where(r =>
-                (r.Status.Contains("失败") || r.Status.Contains("待处理") || r.Status.Contains('缺'))
+                (r.Status.Contains("Thất bại") || r.Status.Contains("Chờ xử lý")
+                    || r.Status.Contains("Thiếu") || r.Status.Contains("thiếu"))
                 && IsMailboxPoolLikeRow(r)
                 && !string.IsNullOrWhiteSpace(r.RawLine)).ToList();
 
             if (failedRows.Count == 0)
             {
-                MessageBox.Show("没有找到需要重注册的失败账号。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Không tìm thấy tài khoản thất bại cần đăng ký lại.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            if (MessageBox.Show($"找到 {failedRows.Count} 条失败/待处理账号，确定重新注册？\n\n流程：注册→获取 access token→存 session 入库",
-                "确认重注册", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            if (MessageBox.Show($"Tìm thấy {failedRows.Count} dòng thất bại/chờ xử lý. OK để đăng ký lại?\n\nQuy trình: đăng ký → lấy access token → lưu session vào kho",
+                "Xác nhận đăng ký lại", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
             if (!TryCreateMailboxFile(failedRows, out string mailboxArg, out string tempFile, out int mailboxCount))
             {
-                MessageBox.Show("失败记录缺少可用邮箱凭据，无法重新注册。", "格式不匹配", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Bản ghi thất bại thiếu thông tin đăng nhập email khả dụng nên không thể đăng ký lại.", "Định dạng không khớp", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -141,12 +142,12 @@ namespace SmsWorkbench
         {
             if (backendTasks.IsRunning)
             {
-                MessageBox.Show("已有批次正在运行，请先取消或等待完成。", "运行中", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Đang có batch chạy, vui lòng hủy hoặc chờ hoàn tất trước.", "Đang chạy", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             string safeArgs = FormatBackendArgsForDisplay(args);
-            var task = new TaskRow { Name = "批次 " + taskSeq++, Task = taskName, Status = "运行中", Info = safeArgs };
+            var task = new TaskRow { Name = "Batch " + taskSeq++, Task = taskName, Status = "Đang chạy", Info = safeArgs };
             Tasks.Add(task);
             ScrollTaskGridToBottom();
             DateTime started = DateTime.Now;
@@ -193,8 +194,8 @@ namespace SmsWorkbench
             });
             try
             {
-                Log("启动：python " + safeArgs);
-                StatusText = taskName + " 运行中";
+                Log("Khởi động: python " + safeArgs);
+                StatusText = taskName + " Đang chạy";
                 BackendCommandResult result = await backendTasks.RunAsync(
                     BackendCommand.Create(
                         taskName,
@@ -207,13 +208,13 @@ namespace SmsWorkbench
                 BackendExecutionResult interpreted = BackendResultInterpreter.Interpret(
                     result, taskName, BackendTaskTimeoutSeconds);
 
-                task.Status = interpreted.IsSuccess ? "完成" : "失败";
+                task.Status = interpreted.IsSuccess ? "Hoàn tất" : "Thất bại";
                 task.Cost = ((int)(DateTime.Now - started).TotalSeconds).ToString(CultureInfo.InvariantCulture);
                 task.DoneAt = SafeTime(DateTime.Now);
-                StatusText = taskName + " 已结束";
+                StatusText = taskName + " Đã kết thúc";
                 RefreshPools();
                 ScrollTaskGridToBottom();
-                if (taskName.StartsWith("账号测活", StringComparison.OrdinalIgnoreCase))
+                if (taskName.StartsWith("Kiểm tra sống tài khoản", StringComparison.OrdinalIgnoreCase))
                 {
                     string output;
                     lock (backendOutputLock)
@@ -225,21 +226,21 @@ namespace SmsWorkbench
             }
             catch (OperationCanceledException)
             {
-                task.Status = "已取消";
+                task.Status = "Đã hủy";
                 task.DoneAt = SafeTime(DateTime.Now);
-                StatusText = taskName + " 已取消";
+                StatusText = taskName + " Đã hủy";
             }
             catch (BackendTaskAlreadyRunningException)
             {
-                task.Status = "未启动";
+                task.Status = "Chưa khởi động";
                 task.DoneAt = SafeTime(DateTime.Now);
-                StatusText = taskName + " 未启动";
-                MessageBox.Show("已有批次正在运行，请先取消或等待完成。", "运行中", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText = taskName + " Chưa khởi động";
+                MessageBox.Show("Đang có batch chạy, vui lòng hủy hoặc chờ hoàn tất trước.", "Đang chạy", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                task.Status = "启动失败";
-                Log("启动失败：" + ex.Message);
+                task.Status = "Khởi động thất bại";
+                Log("Khởi động thất bại: " + ex.Message);
             }
             finally
             {
@@ -249,7 +250,7 @@ namespace SmsWorkbench
 
         private async Task<string> RunBackendWithResultAsync(string taskName, List<string> args, int timeoutMs = 120000)
         {
-            Log("启动：python " + FormatBackendArgsForDisplay(args));
+            Log("Khởi động: python " + FormatBackendArgsForDisplay(args));
             return await backendTasks.RunForResultAsync(
                 BackendCommand.Create(taskName, args, timeoutMs));
         }
@@ -290,7 +291,7 @@ namespace SmsWorkbench
 
         private async Task DeleteSelectedAsync()
         {
-            var selected = SelectedEmailRowsOrNotify("删除");
+            var selected = SelectedEmailRowsOrNotify("Xóa");
             if (selected.Count == 0) return;
             if (!await ShowDeleteConfirmDialog(selected.Count)) return;
             BackendCommandPlan plan = null;
@@ -306,14 +307,14 @@ namespace SmsWorkbench
                 {
                     await DialogFactory.ShowInfoAsync(
                         this,
-                        "删除未完成",
-                        failed + " 条记录未能完整删除。请查看运行日志。");
+                        "Xóa chưa hoàn tất",
+                        failed + " bản ghi chưa xóa hoàn toàn. Vui lòng xem log chạy.");
                 }
             }
             catch (Exception ex)
             {
-                Log("批量删除失败：" + SensitiveDataSanitizer.Redact(ex.Message));
-                await DialogFactory.ShowInfoAsync(this, "删除失败", "批量删除未完成，请查看运行日志。");
+                Log("Xóa hàng loạt thất bại: " + SensitiveDataSanitizer.Redact(ex.Message));
+                await DialogFactory.ShowInfoAsync(this, "Xóa thất bại", "Xóa hàng loạt chưa hoàn tất, vui lòng xem log chạy.");
             }
             finally
             {
@@ -342,9 +343,9 @@ namespace SmsWorkbench
         {
             return await DialogFactory.ShowConfirmAsync(
                 this,
-                "删除选中的 " + count + " 条记录？",
-                "将同步清理本地邮箱池、SQLite 索引和匹配的 session 文件。此操作不可撤销。",
-                "删除",
+                "Xóa " + count + " dòng bản ghi đã chọn?",
+                "Sẽ đồng bộ dọn pool email cục bộ, index SQLite và file session khớp. Thao tác này không thể hoàn tác.",
+                "Xóa",
                 isDanger: true);
         }
 
@@ -358,7 +359,7 @@ namespace SmsWorkbench
             }
             catch (Exception ex)
             {
-                Log("删除文件失败：" + SensitiveDataSanitizer.Redact(path) + " " + SensitiveDataSanitizer.Redact(ex.Message));
+                Log("Xóa file thất bại: " + SensitiveDataSanitizer.Redact(path) + " " + SensitiveDataSanitizer.Redact(ex.Message));
                 return false;
             }
         }
@@ -367,17 +368,17 @@ namespace SmsWorkbench
         {
             if (!backendTasks.IsRunning)
             {
-                Log("当前没有运行中的批次。");
+                Log("Hiện không có batch nào đang chạy.");
                 return;
             }
             try
             {
                 if (backendTasks.Cancel())
-                    Log("已取消当前批次。");
+                    Log("Đã hủy batch hiện tại.");
             }
             catch (Exception ex)
             {
-                Log("取消失败：" + ex.Message);
+                Log("Hủy thất bại: " + ex.Message);
             }
         }
 

@@ -208,7 +208,7 @@ def mark_promotion_status(email, promotion_status="", promotion_result=None, *, 
 
 
 def clear_stale_promotion_at_marker(email, *, runtime_config: ConfigInput = None):
-    """Clear a stale ``AT失效`` promotion marker after a verified relogin.
+    """Clear a stale invalid-AT promotion marker after a verified relogin.
 
     The promotion (优惠) probe label predates the replacement access token.
     Keep ``promotion.last_result`` for later inspection but stop surfacing the
@@ -242,11 +242,12 @@ def clear_stale_promotion_at_marker(email, *, runtime_config: ConfigInput = None
             except Exception:
                 pass
         changed = False
-        if str(data.get("promotion_status") or "").strip() == "AT失效":
+        stale_at_markers = {"AT失效", "AT hết hiệu lực"}
+        if str(data.get("promotion_status") or "").strip() in stale_at_markers:
             data["promotion_status"] = ""
             changed = True
         promotion = data.get("promotion") if isinstance(data.get("promotion"), dict) else None
-        if isinstance(promotion, dict) and str(promotion.get("status") or "").strip() == "AT失效":
+        if isinstance(promotion, dict) and str(promotion.get("status") or "").strip() in stale_at_markers:
             promotion["status"] = ""
             data["promotion"] = promotion
             changed = True
