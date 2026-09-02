@@ -466,14 +466,31 @@ class PaymentLinkManagerTests(unittest.TestCase):
         self.assertEqual(result["link_type"], "direct_card_protocol")
         self.assertEqual(result["manager_state"], "completed")
 
-    def test_direct_card_requires_checkout_proxy_before_subprocess(self):
+    def test_direct_card_runs_direct_without_checkout_proxy(self):
+        completed = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout='{"ok": true, "long_url": "https://chatgpt.com/checkout/openai_llc/oaics_direct", "cs_id": "oaics_direct", "amount_minor": 500}\n',
+            stderr="",
+        )
+        captured = {}
+
+        def fake_run(command, *args, **kwargs):
+            captured["command"] = list(command)
+            captured["env"] = dict(kwargs.get("env") or {})
+            return completed
+
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(manager, "_state_path", return_value=Path(tmp) / "runs.jsonl"):
-                with patch("sms_tool.payment_link_manager.subprocess.run") as run:
-                    result = manager.generate_payment_link("token", payment_method="direct_card")
-        self.assertFalse(result["ok"])
-        self.assertIn("proxy", result["error"].lower())
-        run.assert_not_called()
+                with patch.object(manager.payment_egress, "assert_egress_countries"):
+                    with patch("sms_tool.payment_link_manager.subprocess.run", side_effect=fake_run):
+                        result = manager.generate_payment_link("token", payment_method="direct_card")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["url"], "https://chatgpt.com/checkout/openai_llc/oaics_direct")
+        self.assertEqual(captured["env"]["DIRECT_CARD_CHECKOUT_PROXY"], "")
+        self.assertEqual(captured["env"]["DIRECT_CARD_UPDATE_PROXY"], "")
+        self.assertNotIn("--checkout-proxy", captured["command"])
+        self.assertNotIn("--update-proxy", captured["command"])
 
     def test_direct_card_proxy_credentials_travel_via_env_not_argv(self):
         secret = "socks5h://user:sekret@127.0.0.1:1080"

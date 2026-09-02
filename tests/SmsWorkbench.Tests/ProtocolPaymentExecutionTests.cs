@@ -16,8 +16,8 @@ public sealed class ProtocolPaymentExecutionPlannerTests
                 requireZero: false,
                 requireBaToken: true));
 
-        Assert.Equal("PayPal 协议提链", plan.TaskName);
-        Assert.Equal("正在执行 PayPal 协议提链...", plan.StatusText);
+        Assert.Equal("PayPal Trích link giao thức", plan.TaskName);
+        Assert.Equal("Đang chạy PayPal trích link giao thức...", plan.StatusText);
         Assert.Equal("extract_link", plan.Operation);
         Assert.True(plan.MayHaveSideEffects);
         string[] expectedArguments =
@@ -92,7 +92,7 @@ public sealed class ProtocolPaymentExecutionPlannerTests
         ProtocolPaymentExecutionPlan plan = ProtocolPaymentExecutionPlanner.Create(request);
 
         Assert.Equal("execute_payment", plan.Operation);
-        Assert.Equal("BLIK 协议支付", plan.TaskName);
+        Assert.Equal("BLIK Thanh toán giao thức", plan.TaskName);
         Assert.Contains("--blik-code", plan.Arguments);
     }
 
@@ -158,17 +158,17 @@ public sealed class ProtocolPaymentResultPresenterTests
 
         Assert.Equal("https://pay.example/short", result.Url);
         Assert.Equal("C:\\runtime\\payment.png", result.QrPath);
-        Assert.Contains("[成功] 提取成功!", result.Text, StringComparison.Ordinal);
+        Assert.Contains("[Thành công] Trích xuất thành công!", result.Text, StringComparison.Ordinal);
         Assert.Equal("extract_link", result.Operation);
         Assert.Equal("completed", result.TerminalState);
-        Assert.Contains("AT 探测: HTTP 200", result.Text, StringComparison.Ordinal);
-        Assert.Contains("审批状态: 已批准", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Kiểm tra AT: HTTP 200", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Trạng thái phê duyệt: Đã phê duyệt", result.Text, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData("unknown", "[结果未知，请先核对账号状态，不要重试]")]
-    [InlineData("cancelled", "[已取消]")]
-    [InlineData("timed_out", "[已超时]")]
+    [InlineData("unknown", "[Kết quả không rõ, vui lòng kiểm tra trạng thái tài khoản trước, không thử lại]")]
+    [InlineData("cancelled", "[Đã hủy]")]
+    [InlineData("timed_out", "[Đã timeout]")]
     public void TerminalFailureUsesExistingUiClassification(string state, string prefix)
     {
         ProtocolPaymentResultPresentation result = ProtocolPaymentResultPresenter.Parse(
@@ -177,7 +177,7 @@ public sealed class ProtocolPaymentResultPresenterTests
             """);
 
         Assert.StartsWith(prefix, result.Text, StringComparison.Ordinal);
-        Assert.Contains("错误代码: E_STOP", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Mã lỗi: E_STOP", result.Text, StringComparison.Ordinal);
         Assert.Equal(state, result.TerminalState);
         Assert.Equal("", result.Url);
         Assert.Equal("", result.QrPath);
@@ -201,11 +201,11 @@ public sealed class ProtocolPaymentResultPresenterTests
             }
             """);
 
-        Assert.Contains("[失败] 账号没有真正试用资格，且未检测到 MoMo", result.Text, StringComparison.Ordinal);
-        Assert.Contains("判定: account_trial_ineligible", result.Text, StringComparison.Ordinal);
-        Assert.Contains("支付方式: momo", result.Text, StringComparison.Ordinal);
-        Assert.Contains("订阅状态: chatgptfreeplan", result.Text, StringComparison.Ordinal);
-        Assert.Contains("应付金额: 0 USD", result.Text, StringComparison.Ordinal);
+        Assert.Contains("[Thất bại] 账号没有真正试用资格，且未检测到 MoMo", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Kết luận: account_trial_ineligible", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Phương thức thanh toán: momo", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Trạng thái gói đăng ký: chatgptfreeplan", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Số tiền phải trả: 0 USD", result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("{", result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("\"decision\"", result.Text, StringComparison.Ordinal);
     }
@@ -216,7 +216,7 @@ public sealed class ProtocolPaymentResultPresenterTests
         ProtocolPaymentResultPresentation result = ProtocolPaymentResultPresenter.Parse(
             "{ \"ok\": true, \"status\": \"completed\", \"operation\": \"execute_payment\" }");
 
-        Assert.Contains("[成功] 支付已完成", result.Text, StringComparison.Ordinal);
+        Assert.Contains("[Thành công] Thanh toán đã hoàn tất", result.Text, StringComparison.Ordinal);
         Assert.Equal("execute_payment", result.Operation);
     }
 
@@ -245,7 +245,7 @@ public sealed class ProtocolPaymentResultPresenterTests
         Assert.Equal("unknown", result.TerminalState);
         Assert.False(result.Retryable);
         Assert.True(result.RequiresReconciliation);
-        Assert.Contains("不要重试", result.Text, StringComparison.Ordinal);
+        Assert.Contains("không thử lại", result.Text, StringComparison.Ordinal);
     }
 
     [Fact]

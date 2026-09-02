@@ -36,7 +36,8 @@
         public static BackendCommandPlan CreatePoolRegistration(
             int count,
             IReadOnlyList<string> proxyPool,
-            int workers = 4)
+            int workers = 4,
+            bool checkPromotion = true)
         {
             var args = new List<string>
             {
@@ -44,6 +45,7 @@
                 "--workers", Count(workers),
             };
             AppendNoPhoneReuse(args);
+            AppendCheckPromotion(args, checkPromotion);
             AppendProxyPool(args, proxyPool);
             return new BackendCommandPlan("Đăng ký từ pool email", args);
         }
@@ -61,7 +63,7 @@
             bool registrationAtOnly,
             IReadOnlyList<string> proxyPool,
             bool disable2fa = false,
-            bool checkPromotion = false)
+            bool checkPromotion = true)
         {
             RequireArgument(mailboxArgument, nameof(mailboxArgument));
             RequireArgument(mailboxFile, nameof(mailboxFile));
@@ -99,7 +101,7 @@
             int count,
             IReadOnlyList<string> proxyPool,
             bool disable2fa = false,
-            bool checkPromotion = false)
+            bool checkPromotion = true)
         {
             var args = new List<string> { "--phone-register", "--count", Count(count) };
             AppendNo2fa(args, disable2fa);
@@ -114,7 +116,7 @@
             int workers,
             IReadOnlyList<string> proxyPool,
             bool disable2fa = false,
-            bool checkPromotion = false)
+            bool checkPromotion = true)
         {
             var args = new List<string>
             {
@@ -135,7 +137,7 @@
             int workers,
             IReadOnlyList<string> proxyPool,
             bool disable2fa = false,
-            bool checkPromotion = false)
+            bool checkPromotion = true)
         {
             var args = new List<string>
             {
@@ -157,7 +159,7 @@
             int workers,
             IReadOnlyList<string> proxyPool,
             bool disable2fa = false,
-            bool checkPromotion = false)
+            bool checkPromotion = true)
         {
             var args = new List<string>
             {

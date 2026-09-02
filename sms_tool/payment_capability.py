@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import time
+from collections.abc import Iterable
 from typing import Any, Mapping, Protocol
 
 from .checkout_contract import (
@@ -55,7 +57,24 @@ class CapabilityProbeError(RuntimeError):
 
 
 class ChatGPTStripeCapabilityTransport:
-    """Default wire transport; it never creates or confirms a payment method."""
+    """Default wire transport; it never creates or confirms a payment method.
+
+    Registration can supply its live ``curl_cffi.Session`` so Checkout and
+    Stripe init keep the exact proxy, cookie jar and TLS/browser fingerprint
+    that just created the account. Standalone callers retain the historical
+    isolated transport.
+    """
+
+    def __init__(self, *, registration_session: Any = None, impersonate: str = "") -> None:
+        self.registration_session = registration_session
+        self.impersonate = str(impersonate or "").strip()
+
+    def _registration_post(self, url: str, **kwargs: Any) -> Any:
+        if self.registration_session is None:
+            raise RuntimeError("registration_session is not available")
+        if self.impersonate:
+            kwargs["impersonate"] = self.impersonate
+        return self.registration_session.post(url, **kwargs)
 
     def create_checkout(
         self,
@@ -68,20 +87,52 @@ class ChatGPTStripeCapabilityTransport:
     ) -> CheckoutSessionContract:
         from . import gen_pp_link
 
-        cookie_header = str((auth_context or {}).get("cookie_header") or "")
+        context = auth_context or {}
+        cookie_header = str(context.get("cookie_header") or "")
         try:
-            response = gen_pp_link._checkout_post(
-                CHECKOUT_URL,
-                contract.checkout_payload(),
-                access_token,
-                cookie_header,
-                proxy,
-                timeout,
-                extra_headers={
+            if self.registration_session is not None:
+                headers = {
+                    str(key): str(value)
+                    for key, value in dict(context.get("headers") or {}).items()
+                    if value is not None
+                }
+                headers.update({
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/json",
+                    "Origin": "https://chatgpt.com",
+                    "Referer": (
+                        f"https://chatgpt.com/?promo_campaign={contract.promo_campaign_id}"
+                        if contract.promo_campaign_id
+                        else "https://chatgpt.com/#pricing"
+                    ),
                     "x-openai-target-path": CHECKOUT_PATH,
                     "x-openai-target-route": CHECKOUT_PATH,
-                },
-            )
+                })
+                sentinel_token = str(context.get("sentinel_token") or "").strip()
+                if sentinel_token:
+                    headers["openai-sentinel-token"] = sentinel_token
+                if cookie_header:
+                    headers["Cookie"] = cookie_header
+                response = self._registration_post(
+                    CHECKOUT_URL,
+                    json=contract.checkout_payload(),
+                    headers=headers,
+                    timeout=timeout,
+                )
+            else:
+                response = gen_pp_link._checkout_post(
+                    CHECKOUT_URL,
+                    contract.checkout_payload(),
+                    access_token,
+                    cookie_header,
+                    proxy,
+                    timeout,
+                    extra_headers={
+                        "x-openai-target-path": CHECKOUT_PATH,
+                        "x-openai-target-route": CHECKOUT_PATH,
+                    },
+                )
         except Exception as exc:
             raise CapabilityProbeError(
                 _safe_error(exc),
@@ -122,12 +173,15 @@ class ChatGPTStripeCapabilityTransport:
         from . import gen_pp_link
 
         try:
-            session = gen_pp_link._new_session(proxy)
-            response = session.post(
-                STRIPE_INIT_URL.format(checkout_session_id=checkout.checkout_session_id),
-                data=contract.stripe_init_payload(checkout.publishable_key),
-                timeout=timeout,
-            )
+            url = STRIPE_INIT_URL.format(checkout_session_id=checkout.checkout_session_id)
+            request = {
+                "data": contract.stripe_init_payload(checkout.publishable_key),
+                "timeout": timeout,
+            }
+            if self.registration_session is not None:
+                response = self._registration_post(url, **request)
+            else:
+                response = gen_pp_link._new_session(proxy).post(url, **request)
         except CheckoutContractError as exc:
             raise CapabilityProbeError(
                 str(exc),
@@ -363,6 +417,272 @@ def payment_method_capability_probe(
         }
 
 
+COUNTRY_DEFAULT_CURRENCIES: dict[str, str] = {
+    "US": "USD",
+    "VN": "VND",
+    "PH": "PHP",
+    "ID": "IDR",
+    "KR": "KRW",
+    "JP": "JPY",
+    "BR": "BRL",
+    "IN": "INR",
+    "GB": "GBP",
+    "DE": "EUR",
+    "FR": "EUR",
+    "ES": "EUR",
+    "NL": "EUR",
+    "CH": "CHF",
+    "PL": "PLN",
+    "TR": "TRY",
+    "TH": "THB",
+    "SG": "SGD",
+    "MY": "MYR",
+    "AU": "AUD",
+    "CA": "CAD",
+    "NZ": "NZD",
+    "IE": "EUR",
+}
+
+
+def format_payment_method_badge(method: str) -> str:
+    normalized = str(method or "").strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "card": "Card",
+        "direct_card": "Card",
+        "apple_pay": "Apple Pay",
+        "applepay": "Apple Pay",
+        "google_pay": "Google Pay",
+        "googlepay": "Google Pay",
+        "link": "Link",
+        "momo": "MoMo",
+        "paypal": "PayPal",
+        "gopay": "GoPay",
+        "gcash": "GCash",
+        "grabpay": "GrabPay",
+        "upi": "UPI",
+        "kakao": "Kakao Pay",
+        "kakao_pay": "Kakao Pay",
+        "naver": "Naver Pay",
+        "naver_pay": "Naver Pay",
+        "pix": "PIX",
+        "ideal": "iDEAL",
+        "blik": "BLIK",
+        "twint": "TWINT",
+        "qris": "QRIS",
+        "bizum": "Bizum",
+    }
+    return mapping.get(normalized, str(method).strip())
+
+
+def format_payment_method_badges(
+    payment_method_types: Iterable[str],
+    custom_payment_methods: Iterable[str] = (),
+    *,
+    amount_minor: int | None = None,
+    currency: str = "",
+) -> list[str]:
+    badges: list[str] = []
+    if amount_minor == 0:
+        curr = str(currency or "").strip().upper()
+        if curr in {"VND", "VN"}:
+            badges.append("Trial · 0 đ")
+        elif curr in {"USD", ""}:
+            badges.append("Trial · 0$")
+        else:
+            badges.append(f"Trial · 0 {curr}")
+
+    all_methods = list(payment_method_types or ()) + list(custom_payment_methods or ())
+    for method in all_methods:
+        badge = format_payment_method_badge(method)
+        if badge and badge not in badges:
+            badges.append(badge)
+    return badges
+
+
+def _oaics_capability_payload(checkout: CheckoutSessionContract) -> dict[str, Any]:
+    """Translate OpenAI custom-checkout state into Stripe-like evidence.
+
+    ``oaics_*`` sessions are rendered by ChatGPT itself and are not Stripe
+    payment pages.  Their checkout response already contains the available
+    methods and the authoritative due-today total.  Express Checkout mounts
+    Apple Pay and Google Pay in this UI, matching the Get Session checker.
+    """
+    raw = dict(checkout.raw_payload or {})
+    methods: list[Any] = list(raw.get("payment_method_types") or [])
+    custom = raw.get("custom_payment_methods") or []
+    if isinstance(custom, list):
+        for item in custom:
+            if isinstance(item, Mapping):
+                token = item.get("type") or item.get("id")
+                if token:
+                    methods.append(token)
+            elif item:
+                methods.append(item)
+    methods.extend(("apple_pay", "google_pay"))
+    raw["payment_method_types"] = methods
+    return raw
+
+
+def _is_oaics_stripe_missing(checkout: CheckoutSessionContract, exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return checkout.checkout_session_id.startswith("oaics_") and (
+        "resource_missing" in message or "no such payment_page" in message
+    )
+
+
+def detect_account_payment_methods(
+    access_token: str,
+    *,
+    auth_context: dict[str, Any] | None = None,
+    proxy: Any = None,
+    billing_country: str = "",
+    currency: str = "",
+    promo_campaign_id: str = "plus-1-month-free",
+    timeout: int = 30,
+    transport: PaymentCapabilityTransport | None = None,
+    registration_session: Any = None,
+) -> dict[str, Any]:
+    """Detect available payment methods and trial state without creating side effects."""
+    checked_at = int(time.time())
+    base = {
+        "ok": False,
+        "status": "unknown",
+        "checked_at": checked_at,
+        "billing_country": "",
+        "currency": "",
+        "amount_minor": None,
+        "amount_due": None,
+        "is_zero_due": False,
+        "payment_method_types": [],
+        "custom_payment_methods": [],
+        "offer_state": "unknown_amount",
+        "badges": [],
+        "payment_method_badges": [],
+        "error": "",
+        "error_code": "",
+        "error_stage": "",
+        "retryable": False,
+    }
+    token = str(access_token or "").strip()
+    if not token:
+        return {
+            **base,
+            "status": "failed",
+            "error": "missing_access_token",
+            "error_code": "missing_access_token",
+            "error_stage": "checkout_create",
+        }
+    auth = dict(auth_context or {})
+    country = str(billing_country or auth.get("registration_country") or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        return {
+            **base,
+            "status": "failed",
+            "error": "registration country is required for payment-method detection",
+            "error_code": "payment_country_unknown",
+            "error_stage": "payment_detection_context",
+        }
+    curr = str(currency or COUNTRY_DEFAULT_CURRENCIES.get(country, "")).strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", curr):
+        return {
+            **base,
+            "status": "failed",
+            "billing_country": country,
+            "error": f"currency is unknown for registration country {country}",
+            "error_code": "payment_currency_unknown",
+            "error_stage": "payment_detection_context",
+        }
+    try:
+        contract = CheckoutRequestContract.for_payment_method(
+            "direct_card",
+            billing_country=country,
+            currency=curr,
+            promo_campaign_id=promo_campaign_id,
+            prefetch=True,
+            cancel_url="https://chatgpt.com/#pricing",
+            coupon_from_query_param=True,
+        )
+        wire = transport or ChatGPTStripeCapabilityTransport(
+            registration_session=registration_session,
+            impersonate=str(auth.get("impersonate") or ""),
+        )
+        checkout = wire.create_checkout(
+            contract,
+            access_token=token,
+            auth_context=auth,
+            proxy=_proxy_text(proxy),
+            timeout=max(5, int(timeout or 30)),
+        )
+        try:
+            init_payload = wire.stripe_init(
+                contract,
+                checkout,
+                proxy=_proxy_text(proxy),
+                timeout=max(5, int(timeout or 30)),
+            )
+        except CapabilityProbeError as exc:
+            if not _is_oaics_stripe_missing(checkout, exc):
+                raise
+            init_payload = _oaics_capability_payload(checkout)
+        evidence = StripeCapabilityEvidence.from_payload(init_payload, fallback_currency=contract.currency)
+        badges = format_payment_method_badges(
+            evidence.payment_method_types,
+            evidence.custom_payment_methods,
+            amount_minor=evidence.amount_minor,
+            currency=evidence.currency or contract.currency,
+        )
+        return {
+            **base,
+            "ok": True,
+            "status": "completed",
+            "billing_country": contract.billing_country,
+            "currency": evidence.currency or contract.currency,
+            "amount_minor": evidence.amount_minor,
+            "amount_due": evidence.amount_minor,
+            "is_zero_due": evidence.amount_minor == 0,
+            "payment_method_types": list(evidence.payment_method_types),
+            "custom_payment_methods": list(evidence.custom_payment_methods),
+            "offer_state": evidence.offer_state,
+            "badges": badges,
+            "payment_method_badges": badges,
+        }
+    except Exception as exc:
+        return {
+            **base,
+            "status": str(getattr(exc, "status", "failed") or "failed"),
+            "billing_country": country,
+            "currency": curr,
+            "error": _safe_error(exc),
+            "error_code": str(getattr(exc, "error_code", "payment_method_detection_failed") or "payment_method_detection_failed"),
+            "error_stage": str(getattr(exc, "error_stage", "payment_method_detection") or "payment_method_detection"),
+            "retryable": bool(getattr(exc, "retryable", True)),
+        }
+
+
+def _response_error_detail(response: Any) -> str:
+    from .sanitizer import sanitize_text
+
+    try:
+        payload = response.json()
+    except Exception:
+        text = getattr(response, "text", "")
+        if not text:
+            return ""
+        detail = sanitize_text(text).replace("\r", " ").replace("\n", " ").strip()
+        if len(detail) > 240:
+            detail = detail[:237] + "..."
+        return f": {detail}" if detail else ""
+    if isinstance(payload, Mapping):
+        values = [payload.get(key) for key in ("detail", "error", "message", "code")]
+        text = " | ".join(sanitize_text(value) for value in values if value not in (None, ""))
+    else:
+        text = sanitize_text(payload)
+    text = " ".join(str(text).split())
+    if not text:
+        return ""
+    return ": " + (text[:237] + "..." if len(text) > 240 else text)
+
+
 def _response_json(
     response: Any,
     *,
@@ -374,8 +694,9 @@ def _response_json(
     if status_code >= 400:
         retryable = status_code in {403, 408, 409, 425, 429} or status_code >= 500
         code = unauthorized_code if status_code in {401, 403} else failure_code
+        detail = _response_error_detail(response)
         raise CapabilityProbeError(
-            f"{stage} returned HTTP {status_code}",
+            f"{stage} returned HTTP {status_code}{detail}",
             error_code=code,
             error_stage=stage,
             retryable=retryable,

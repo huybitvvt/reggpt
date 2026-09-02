@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass
-from typing import Any, Iterable
+from dataclasses import dataclass, field
+from typing import Any, Iterable, Mapping
 
 from .payment_catalog import PAYMENT_METHODS as CATALOG_PAYMENT_METHODS
 
@@ -113,6 +113,9 @@ class CheckoutRequestContract:
     plan_name: str = "chatgptplusplan"
     promo_campaign_id: str = "plus-1-month-free"
     checkout_ui_mode: str = "custom"
+    prefetch: bool = False
+    cancel_url: str = ""
+    coupon_from_query_param: bool = False
 
     @classmethod
     def for_payment_method(
@@ -126,6 +129,9 @@ class CheckoutRequestContract:
         browser_timezone: str = "",
         promo_campaign_id: str = "plus-1-month-free",
         checkout_ui_mode: str = "custom",
+        prefetch: bool = False,
+        cancel_url: str = "",
+        coupon_from_query_param: bool = False,
     ) -> "CheckoutRequestContract":
         key = str(payment_method or "").strip().lower().replace("-", "_")
         profile = PAYMENT_METHOD_PROFILES.get(key)
@@ -140,6 +146,9 @@ class CheckoutRequestContract:
             browser_timezone=str(browser_timezone or profile.browser_timezone).strip(),
             promo_campaign_id=str(promo_campaign_id or "").strip(),
             checkout_ui_mode=str(checkout_ui_mode or "custom").strip(),
+            prefetch=bool(prefetch),
+            cancel_url=str(cancel_url or "").strip(),
+            coupon_from_query_param=bool(coupon_from_query_param),
         )
         contract.validate()
         return contract
@@ -166,10 +175,14 @@ class CheckoutRequestContract:
             },
             "checkout_ui_mode": self.checkout_ui_mode,
         }
+        if self.prefetch:
+            payload["prefetch"] = True
+        if self.cancel_url:
+            payload["cancel_url"] = self.cancel_url
         if self.promo_campaign_id:
             payload["promo_campaign"] = {
                 "promo_campaign_id": self.promo_campaign_id,
-                "is_coupon_from_query_param": False,
+                "is_coupon_from_query_param": self.coupon_from_query_param,
             }
         return payload
 
@@ -209,6 +222,7 @@ class CheckoutSessionContract:
     checkout_session_id: str
     processor_entity: str
     publishable_key: str
+    raw_payload: Mapping[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_payload(
@@ -239,7 +253,7 @@ class CheckoutSessionContract:
         if not processor:
             processor = "openai_llc" if billing_country.upper() == "US" else "openai_ie"
         publishable_key = str(payload.get("publishable_key") or fallback_publishable_key or "").strip()
-        return cls(session_id, processor, publishable_key)
+        return cls(session_id, processor, publishable_key, dict(payload))
 
 
 @dataclass(frozen=True)
@@ -329,6 +343,7 @@ def _values_for_key(value: Any, target: str, *, depth: int = 0) -> Iterable[Any]
 
 def _extract_amount_minor(payload: dict[str, Any]) -> int | None:
     paths = (
+        ("checkout_state", "total", "total", "minorUnitsAmount"),
         ("total_summary", "due"),
         ("invoice", "amount_due"),
         ("elements_options", "amount"),

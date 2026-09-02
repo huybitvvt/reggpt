@@ -137,9 +137,12 @@ def check_account_promotion(
     timezone_offset_min: str = "-",
     *,
     browser_fetch: Any = None,
+    request_session: Any = None,
 ) -> dict[str, Any]:
     """Probe accounts/check for one account and return plan + promotion detail.
 
+    When ``request_session`` is provided, the probe reuses that live
+    registration session, including its cookie jar, proxy and TLS profile.
     When ``browser_fetch`` is provided, the probe is routed through the
     browser context's ``fetch_json`` method instead of ``curl_cffi``,
     carrying the real browser fingerprint and cookies to bypass
@@ -151,14 +154,18 @@ def check_account_promotion(
 
     had_identity_context = bool(account.get("identity_context")) if isinstance(account, dict) else False
     identity = bind_account_identity(account)
-    # Promotion checks are separate account operations; do not reuse a saved
-    # browser-registration exit that may now be blocked or contaminated.
-    resolved_proxy = select_operation_proxy(
-        account if had_identity_context else {key: value for key, value in account.items() if key != "identity_context"},
-        operation="promotion",
-        explicit=proxy,
-        config=CFG,
-    )
+    resolved_proxy = ""
+    if request_session is None:
+        # Saved-account promotion checks are separate account operations; do
+        # not reuse a stale browser-registration exit. The inline registration
+        # stage explicitly supplies request_session and therefore stays on the
+        # exact session/proxy that just created the account.
+        resolved_proxy = select_operation_proxy(
+            account if had_identity_context else {key: value for key, value in account.items() if key != "identity_context"},
+            operation="promotion",
+            explicit=proxy,
+            config=CFG,
+        )
 
     account_id = account_chatgpt_id(account) if isinstance(account, dict) else _jwt_account_id(token)
     did = str(identity.get("device_id") or (account.get("device_id") if isinstance(account, dict) else "") or "")
@@ -170,9 +177,28 @@ def check_account_promotion(
 
     url = f"{ACCOUNTS_CHECK_URL}?timezone_offset_min={timezone_offset_min}"
 
+    if request_session is not None:
+        try:
+            response = request_session.get(
+                url,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=False,
+            )
+        except Exception as exc:
+            error = str(exc)
+            for candidate in (str(proxy or "").strip(),):
+                if candidate:
+                    error = error.replace(candidate, _redact_proxy_url(candidate, empty_placeholder=""))
+            return {"ok": False, "promotion_status": "Kiểm tra thất bại", "error": error[:300]}
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        try:
+            body = response.json()
+        except Exception:
+            return {"ok": False, "promotion_status": "Kiểm tra thất bại", "error": "invalid_json", "status_code": status_code}
     # When a browser fetch callable is provided, route the probe through the
     # browser context to carry the real fingerprint and cookies.
-    if browser_fetch is not None:
+    elif browser_fetch is not None:
         try:
             result = browser_fetch(url, headers=headers, timeout_ms=timeout * 1000)
             # ``PlaywrightBrowserSession.fetch_json`` returns the HTTP status

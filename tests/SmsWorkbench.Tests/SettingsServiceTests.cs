@@ -99,8 +99,23 @@ public sealed class SettingsServiceTests
 
         Assert.Equal(SettingFieldKind.Secret, SettingsCatalog.AllFields.Single(field => field.Key == "roxy_api_token").Kind);
         Assert.Equal(SettingFieldKind.Secret, SettingsCatalog.AllFields.Single(field => field.Key == "cloak_license_key").Kind);
+        Assert.Equal(
+            "email_registration.registration_mode",
+            SettingsCatalog.AllFields.Single(field => field.Key == "registration_auth_mode").JsonPath);
+        Assert.Equal(
+            new[] { "password", "passwordless" },
+            SettingsCatalog.AllFields.Single(field => field.Key == "registration_auth_mode").Options);
+        Assert.Equal(
+            "registration.detect_offer",
+            SettingsCatalog.AllFields.Single(field => field.Key == "registration_detect_offer").JsonPath);
+        Assert.Equal(
+            "registration.detect_payment_methods",
+            SettingsCatalog.AllFields.Single(field => field.Key == "registration_detect_payment_methods").JsonPath);
+        Assert.Equal(
+            "registration.payment_country",
+            SettingsCatalog.AllFields.Single(field => field.Key == "registration_payment_country").JsonPath);
         Assert.Contains(
-            SettingsCatalog.Categories.Single(category => category.Title == "注册与接码").Sections,
+            SettingsCatalog.Categories.Single(category => category.Title == "Đăng ký và nhận mã").Sections,
             section => section.Title == "RoxyBrowser");
     }
 

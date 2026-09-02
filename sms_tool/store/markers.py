@@ -159,6 +159,7 @@ def mark_promotion_status(email, promotion_status="", promotion_result=None, *, 
     conn = _connect(runtime_config=runtime_config)
     json_path = ""
     data = {}
+    session_data = None
     try:
         lookup_email = _find_existing_account_email(conn, email)
         if not lookup_email:
@@ -178,21 +179,58 @@ def mark_promotion_status(email, promotion_status="", promotion_result=None, *, 
             try:
                 file_data = json.loads(Path(json_path).read_text(encoding="utf-8"))
                 if isinstance(file_data, dict):
-                    data = {**file_data, **data}
+                    session_data = file_data
             except Exception:
                 pass
-        promotion = data.get("promotion") if isinstance(data.get("promotion"), dict) else {}
-        promotion["status"] = str(promotion_status or "")
-        promotion["updated_at"] = now
-        if isinstance(promotion_result, dict):
-            promotion["last_result"] = {
-                key: value
-                for key, value in promotion_result.items()
-                if key not in {"access_token", "authorization", "cookie", "cookie_header"}
-            }
-        data["promotion"] = promotion
-        data["promotion_status"] = str(promotion_status or "")
-        data["promotion_updated_at"] = now
+
+        def update_target(target):
+            promotion = target.get("promotion") if isinstance(target.get("promotion"), dict) else {}
+            promotion["status"] = str(promotion_status or "")
+            promotion["updated_at"] = now
+            if isinstance(promotion_result, dict):
+                promotion["last_result"] = {
+                    key: value
+                    for key, value in promotion_result.items()
+                    if key not in {"access_token", "authorization", "cookie", "cookie_header"}
+                }
+                capability = promotion_result.get("payment_capability")
+                capability = capability if isinstance(capability, dict) else {}
+                badges = promotion_result.get("payment_method_badges")
+                if badges is None:
+                    badges = capability.get("payment_method_badges", capability.get("badges"))
+                if badges is not None:
+                    target["payment_method_badges"] = badges
+                if capability:
+                    target["payment_capability"] = capability
+                for key in (
+                    "payment_method_types", "custom_payment_methods", "currency", "offer_state",
+                    "payment_check_status", "payment_check_error", "payment_checked_at",
+                ):
+                    if key in promotion_result:
+                        target[key] = promotion_result[key]
+                    elif key in capability:
+                        target[key] = capability[key]
+                if capability:
+                    target["payment_check_status"] = capability.get(
+                        "status", target.get("payment_check_status", "")
+                    )
+                    target["payment_check_error"] = capability.get(
+                        "error", target.get("payment_check_error", "")
+                    )
+                    target["payment_checked_at"] = capability.get(
+                        "checked_at", target.get("payment_checked_at", 0)
+                    )
+                if "amount_due" in promotion_result:
+                    target["amount_due"] = promotion_result["amount_due"]
+                elif "amount_due" in capability or "amount_minor" in capability:
+                    target["amount_due"] = capability.get("amount_due", capability.get("amount_minor"))
+            target["promotion"] = promotion
+            target["promotion_status"] = str(promotion_status or "")
+            target["promotion_updated_at"] = now
+
+        update_target(data)
+        if isinstance(session_data, dict):
+            update_target(session_data)
         raw_json = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
         conn.execute(
             "UPDATE accounts SET updated_at=?, raw_json=? WHERE lower(email)=lower(?)",
@@ -201,8 +239,8 @@ def mark_promotion_status(email, promotion_status="", promotion_result=None, *, 
         conn.commit()
     finally:
         conn.close()
-    if json_path:
-        _update_session_json(json_path, data)
+    if json_path and isinstance(session_data, dict):
+        _update_session_json(json_path, session_data)
     return True
 
 

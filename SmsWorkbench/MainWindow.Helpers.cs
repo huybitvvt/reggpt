@@ -62,7 +62,7 @@
                 settingsService.GetString("proxy.registration"),
                 settingsService.GetString("registration_proxy"),
                 settingsService.GetString("proxy.default"));
-            return configured;
+            return configured.Length > 0 ? configured : LocalNonPaymentProxy;
         }
 
         private List<string> GetRegistrationProxyPool()

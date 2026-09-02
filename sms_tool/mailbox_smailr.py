@@ -121,6 +121,12 @@ def _take_reusable_smailr_mailbox(client: Any, domain: str, reserved: set[str]) 
             mail_count = int(item.get("mail_count") or 0)
         except (TypeError, ValueError):
             mail_count = 0
+        # Reusing a mailbox that already received a verification email can
+        # revive an incomplete server-side signup and leave a fresh client
+        # session in ``invalid_auth_step``.  Only untouched inboxes are safe
+        # candidates for a new registration attempt.
+        if mail_count > 0:
+            continue
         if get_account_record(email):
             continue
         candidate = dict(item)

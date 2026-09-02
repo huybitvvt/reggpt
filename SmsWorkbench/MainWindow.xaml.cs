@@ -1,9 +1,10 @@
-﻿namespace SmsWorkbench
+namespace SmsWorkbench
 {
     public partial class MainWindow : FluentWindow, INotifyPropertyChanged
     {
         private Wpf.Ui.Appearance.ApplicationTheme _currentTheme = Wpf.Ui.Appearance.ApplicationTheme.Light;
         private static readonly HttpClient httpClient = new HttpClient();
+        private const string LocalNonPaymentProxy = "http://127.0.0.1:7897";
         private readonly IBackendClient backendClient;
         private readonly IBackendTaskCoordinator backendTasks;
         private readonly IDesktopReadClient desktopRead;
@@ -101,6 +102,33 @@
         public ObservableCollection<TaskRow> Tasks { get; } = new ObservableCollection<TaskRow>();
 
         public ObservableCollection<PoolRow> PagedRows { get; } = new ObservableCollection<PoolRow>();
+
+        public ObservableCollection<AccountFilterChip> PaymentFilterChips { get; } = new ObservableCollection<AccountFilterChip>
+        {
+            new AccountFilterChip("trial", "Trial"),
+            new AccountFilterChip("no_offer", "No offer"),
+            new AccountFilterChip("momo", "MoMo"),
+            new AccountFilterChip("gpay", "GPay"),
+            new AccountFilterChip("apple_pay", "Apple Pay"),
+            new AccountFilterChip("card", "Card"),
+            new AccountFilterChip("upi", "UPI"),
+            new AccountFilterChip("gopay", "GoPay"),
+            new AccountFilterChip("kakao", "Kakao"),
+            new AccountFilterChip("naver", "Naver"),
+            new AccountFilterChip("payment_error", "PTTT lỗi"),
+            new AccountFilterChip("unchecked", "Chưa check"),
+        };
+
+        public string PaymentFilterSummary
+        {
+            get
+            {
+                int selected = PaymentFilterChips.Count(chip => chip.IsSelected);
+                return selected == 0 ? "Tất cả job" : $"{selected} điều kiện";
+            }
+        }
+
+        public bool HasPaymentFilters => PaymentFilterChips.Any(chip => chip.IsSelected);
 
         public PoolRow SelectedRow { get; set; }
 
@@ -280,6 +308,10 @@
         public string PayPalStatus { get; set; } = "";
         public string PayPalAmount { get; set; } = "";
         public string PromotionStatus { get; set; } = "";
+        public string PaymentCheckStatus { get; set; } = "";
+        public string OfferState { get; set; } = "";
+        public string PaymentCheckError { get; set; } = "";
+        public long PaymentCheckedAt { get; set; }
         public string RefreshTokenStatus { get; set; } = "";
         public string TwoFactorStatus { get; set; } = "Chưa thiết lập";
         public string Phone { get; set; } = "";
@@ -297,6 +329,7 @@
         public string RawRefreshToken { get; set; } = "";
         public string MailboxProvider { get; set; } = "";
         public string MailboxToken { get; set; } = "";
+        public IReadOnlyList<string> PaymentMethodBadges { get; set; } = Array.Empty<string>();
     }
 
     public sealed class RegisterOptions
@@ -304,7 +337,7 @@
         public string Source { get; set; } = "pool";
         public int Count { get; set; } = 1;
         public int Workers { get; set; } = 4;
-        public bool Disable2fa { get; set; } = true;
+        public bool Disable2fa { get; set; }
         public bool CheckPromotion { get; set; }
     }
 

@@ -754,11 +754,6 @@ class CheckoutExtractor:
     def _stage_proxies(self) -> tuple[str, str]:
         checkout_proxy = normalize_proxy_url(self.config.checkout_proxy)
         update_proxy = normalize_proxy_url(self.config.update_proxy)
-        if not checkout_proxy or not update_proxy:
-            raise ExtractorError(
-                "checkout and update proxies are required; pass --checkout-proxy/--update-proxy "
-                "or set DIRECT_CARD_CHECKOUT_PROXY/DIRECT_CARD_UPDATE_PROXY"
-            )
         return checkout_proxy, update_proxy
 
     def _probe_country(self, proxy: str, expected_country: str) -> None:
@@ -784,15 +779,21 @@ class CheckoutExtractor:
     def _preflight(self, checkout_proxy: str, update_proxy: str) -> None:
         if not self.config.verify_proxy_country:
             return
+        if not checkout_proxy and not update_proxy:
+            self.log("Proxy check skipped: DIRECT checkout/update.")
+            return
         with ThreadPoolExecutor(max_workers=2) as executor:
-            checkout_future = executor.submit(
-                self._probe_country, checkout_proxy, self.config.checkout_proxy_country
-            )
-            update_future = executor.submit(
-                self._probe_country, update_proxy, self.config.update_proxy_country
-            )
-            checkout_future.result()
-            update_future.result()
+            futures = []
+            if checkout_proxy:
+                futures.append(executor.submit(
+                    self._probe_country, checkout_proxy, self.config.checkout_proxy_country
+                ))
+            if update_proxy:
+                futures.append(executor.submit(
+                    self._probe_country, update_proxy, self.config.update_proxy_country
+                ))
+            for future in futures:
+                future.result()
         self.log(
             f"Proxy check passed: checkout={self.config.checkout_proxy_country}, "
             f"update={self.config.update_proxy_country}."

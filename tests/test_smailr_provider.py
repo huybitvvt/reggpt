@@ -268,6 +268,47 @@ def test_smailr_reuses_empty_existing_mailbox_when_server_default_requires_highe
     assert '"reused_existing": true' in accounts[0].source
 
 
+def test_smailr_does_not_reuse_mailbox_that_already_received_mail():
+    level_error = SmailrError(
+        "domain level restricted",
+        status_code=403,
+        body={"error": "domain level restricted"},
+    )
+    used = {
+        "id": "mb-used",
+        "address": "used@smailr.com",
+        "mail_count": 1,
+        "is_archived": False,
+        "receiveEnabled": True,
+    }
+    untouched = {
+        "id": "mb-empty",
+        "address": "empty@smailr.com",
+        "mail_count": 0,
+        "is_archived": False,
+        "receiveEnabled": True,
+    }
+
+    with patch.object(mailbox_smailr, "_smailr_cfg", return_value={
+        "default_domain": "smailr.com",
+        "reuse_existing_on_level_error": True,
+    }), patch(
+        "sms_tool.providers.smailr_mailbox.SmailrClient.create_mailbox",
+        side_effect=level_error,
+    ), patch(
+        "sms_tool.providers.smailr_mailbox.SmailrClient.list_mailboxes",
+        return_value=[used, untouched],
+    ), patch("sms_tool.storage.get_account_record", return_value={}):
+        accounts = mailbox_smailr.create_smailr_mailboxes(
+            1,
+            domain="smailr.com",
+            api_key="nm_test",
+        )
+
+    assert accounts[0].email == "empty@smailr.com"
+    assert accounts[0].token == "mb-empty"
+
+
 def test_smailr_reuses_requested_non_default_domain_without_domain_id():
     existing = {
         "id": "mb-existing",

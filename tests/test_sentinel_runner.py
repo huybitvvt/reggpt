@@ -109,6 +109,25 @@ def test_client_fetches_challenge_and_passes_same_identity_to_runner():
     assert f"oai-did={DEVICE_ID}" in runner.call_args.kwargs["cookie"]
 
 
+def test_client_supports_get_session_checkout_flow():
+    session = _Session()
+    emitted = json.dumps(
+        {"p": "proof", "t": "turnstile", "c": "challenge-test", "id": DEVICE_ID, "flow": "chatgpt_checkout"}
+    )
+    with patch("sms_tool.sentinel.client.run_sentinel_sdk", return_value=emitted) as runner:
+        result = client.issue_sentinel_token(
+            flow="chatgpt_checkout",
+            device_id=DEVICE_ID,
+            session=session,
+            profile=PROFILE,
+        )
+
+    assert result.flow == "chatgpt_checkout"
+    request = json.loads(session.calls[0][1]["data"])
+    assert request["flow"] == "chatgpt_checkout"
+    assert runner.call_args.kwargs["page_url"] == "https://chatgpt.com/"
+
+
 def test_runner_keeps_cookie_out_of_process_arguments():
     class _Completed:
         returncode = 0

@@ -68,11 +68,14 @@ namespace SmsWorkbench
 
     public sealed partial class PaymentBatchResultRow : ObservableObject
     {
+        [ObservableProperty] private int rowNumber;
         [ObservableProperty] private string accountRef = "";
         [ObservableProperty] private string progressText = "0%";
         [ObservableProperty] private double progressPercent;
         [ObservableProperty] private string currentStage = "Đang chờ";
         [ObservableProperty] private string resultStatus = "Đang chờ";
+        [ObservableProperty] private string elapsedText = "0.0s";
+        [ObservableProperty] private IReadOnlyList<string> methodBadges = Array.Empty<string>();
         public string MatrixCell { get; init; } = "";
         public string AuthStatus { get; init; } = "";
         public string RefreshStatus { get; init; } = "";
@@ -86,17 +89,31 @@ namespace SmsWorkbench
         public bool ResultPresent { get; init; }
         public bool AuthorizationQueued { get; init; }
         public string AuthorizationStatus { get; init; } = "";
+        public string DetailText { get; init; } = "";
         public string AuthorizationDisplay => AuthorizationQueued
             ? AuthorizationStatus.Length > 0 ? AuthorizationStatus : "pending"
             : "";
         public string ResultDisplay => ResultValue.Length > 0
             ? ResultValue
-            : ResultPresent ? "Đã tạo (báo cáo chỉ giữ trạng thái tồn tại)" : Decision;
+            : ResultPresent ? "Đã tạo (báo cáo chỉ giữ trạng thái tồn tại)" : DetailText.Length > 0 ? DetailText : Decision;
         public bool HasCopyableResult => ResultValue.Length > 0;
         public string CopyToolTip => HasCopyableResult
             ? $"Sao chép {ResultKind}"
             : ResultPresent ? "Báo cáo chỉ giữ trạng thái tồn tại của kết quả thanh toán" : "Không có kết quả thanh toán để sao chép";
         public int Attempts { get; init; }
+
+        public string StatusBadgeText => ResultStatus switch
+        {
+            "Thành công" => "SUCCESS",
+            "Đang chạy" => "RUNNING",
+            "Thất bại" => "FAILED",
+            _ => "PENDING"
+        };
+
+        partial void OnResultStatusChanged(string value)
+        {
+            OnPropertyChanged(nameof(StatusBadgeText));
+        }
     }
 
     public sealed record PaymentBatchRequest(

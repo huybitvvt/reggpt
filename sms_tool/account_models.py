@@ -211,4 +211,33 @@ class AccountSessionModel:
             "workspace_scan": dict(self.workspace),
             "identity_context": dict(self.identity_context),
         }
+        payment_capability = self._raw.get("payment_capability")
+        if isinstance(payment_capability, Mapping):
+            value["payment_capability"] = dict(payment_capability)
+        promotion = self._raw.get("promotion")
+        if isinstance(promotion, Mapping):
+            value["promotion"] = dict(promotion)
+        promotion_result = self._raw.get("promotion_result")
+        if isinstance(promotion_result, Mapping):
+            value["promotion_result"] = dict(promotion_result)
+        promotion_status = str(self._raw.get("promotion_status") or "").strip()
+        if promotion_status:
+            value["promotion_status"] = promotion_status
+        for key in ("payment_method_badges", "payment_method_types", "custom_payment_methods"):
+            items = self._raw.get(key)
+            if isinstance(items, (list, tuple)):
+                value[key] = [str(item).strip() for item in items if str(item).strip()]
+        for key in (
+            "amount_due", "currency", "offer_state",
+            "payment_check_status", "payment_check_error", "payment_checked_at",
+        ):
+            if key in self._raw and self._raw.get(key) is not None:
+                value[key] = self._raw.get(key)
+        if isinstance(payment_capability, Mapping):
+            if not value.get("payment_check_status"):
+                value["payment_check_status"] = payment_capability.get("status") or ""
+            if not value.get("payment_check_error"):
+                value["payment_check_error"] = payment_capability.get("error") or ""
+            if not value.get("payment_checked_at"):
+                value["payment_checked_at"] = payment_capability.get("checked_at") or 0
         return sanitize(value)

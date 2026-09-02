@@ -436,8 +436,6 @@ def _run_direct_card(spec: PaymentMethodSpec, access_token: str, proxy: Any = No
     checkout_proxy = str(
         kwargs.get("checkout_proxy") or proxy or kwargs.get("provider_proxy") or ""
     ).strip()
-    if not checkout_proxy:
-        return {"ok": False, "error": f"{spec.label} requires a checkout proxy seed"}
     update_proxy = str(
         kwargs.get("promotion_proxy") or kwargs.get("approve_proxy") or checkout_proxy or ""
     ).strip()
@@ -451,9 +449,8 @@ def _run_direct_card(spec: PaymentMethodSpec, access_token: str, proxy: Any = No
 
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
-    # Proxies carry inline credentials, so they travel through the environment
-    # (read by the extractor as DIRECT_CARD_CHECKOUT_PROXY/_UPDATE_PROXY) rather
-    # than argv, where they would be visible in the process list.
+    # Proxies carry inline credentials through the environment rather than argv.
+    # Empty values intentionally mean DIRECT/Wi-Fi.
     env["DIRECT_CARD_CHECKOUT_PROXY"] = checkout_proxy
     env["DIRECT_CARD_UPDATE_PROXY"] = update_proxy
     token_file = _write_token_file(access_token)

@@ -100,7 +100,7 @@ public sealed class BackendResultInterpreterTests
         {
             ["status"] = "account_deactivated"
         };
-        Assert.Equal("账号停用", BackendResultInterpreter.ProbeStatusLabel(probe));
+        Assert.Equal("Tài khoản bị dừng", BackendResultInterpreter.ProbeStatusLabel(probe));
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class BackendResultInterpreterTests
         {
             ["status_code"] = "401"
         };
-        Assert.Equal("AT失效 / HTTP 401", BackendResultInterpreter.ProbeStatusLabel(probe));
+        Assert.Equal("AT hết hiệu lực / HTTP 401", BackendResultInterpreter.ProbeStatusLabel(probe));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class BackendResultInterpreterTests
             ["ok"] = true,
             ["status_code"] = "200"
         };
-        Assert.Equal("AT有效 / HTTP 200", BackendResultInterpreter.ProbeStatusLabel(probe));
+        Assert.Equal("AT hợp lệ / HTTP 200", BackendResultInterpreter.ProbeStatusLabel(probe));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class BackendResultInterpreterTests
         {
             ["ok"] = true
         };
-        Assert.Equal("AT有效", BackendResultInterpreter.ProbeStatusLabel(probe));
+        Assert.Equal("AT hợp lệ", BackendResultInterpreter.ProbeStatusLabel(probe));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class BackendResultInterpreterTests
         {
             ["status_code"] = "500"
         };
-        Assert.Equal("测活失败 / HTTP 500", BackendResultInterpreter.ProbeStatusLabel(probe));
+        Assert.Equal("Kiểm tra sống thất bại / HTTP 500", BackendResultInterpreter.ProbeStatusLabel(probe));
     }
 
     // ── IsProbeSucceeded / IsProbeReturned401 ───────────────────────────
@@ -224,14 +224,14 @@ public sealed class BackendResultInterpreterTests
     // ── ScanStatusLabel ─────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("alive", "正常")]
-    [InlineData("alive_probe_inconclusive", "RT正常 / OAuth深度探测未完成")]
-    [InlineData("account_deactivated", "账号掉号")]
-    [InlineData("secondary_phone_verification_required", "手机验证")]
-    [InlineData("phone_verification_required", "支付完成")]
-    [InlineData("scan_failed", "扫描失败")]
+    [InlineData("alive", "Bình thường")]
+    [InlineData("alive_probe_inconclusive", "RT bình thường / kiểm tra sâu OAuth chưa hoàn tất")]
+    [InlineData("account_deactivated", "Tài khoản bị vô hiệu")]
+    [InlineData("secondary_phone_verification_required", "Xác minh điện thoại")]
+    [InlineData("phone_verification_required", "Thanh toán hoàn tất")]
+    [InlineData("scan_failed", "Quét thất bại")]
     [InlineData("unknown_status", "unknown_status")]
-    [InlineData("", "未知")]
+    [InlineData("", "Không rõ")]
     public void ScanStatusLabel_ReturnsCorrectLabel(string input, string expected)
     {
         Assert.Equal(expected, BackendResultInterpreter.ScanStatusLabel(input));
@@ -288,7 +288,7 @@ public sealed class BackendResultInterpreterTests
 
         Assert.False(interpreted.IsSuccess);
         Assert.Equal("timed_out", interpreted.State);
-        Assert.Contains("超时", interpreted.DisplayText);
+        Assert.Contains("timeout", interpreted.DisplayText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -300,7 +300,7 @@ public sealed class BackendResultInterpreterTests
         Assert.False(interpreted.IsSuccess);
         Assert.Equal("failed", interpreted.State);
         Assert.Contains("something went wrong", interpreted.DisplayText);
-        Assert.Contains("参数", interpreted.DisplayText);
+        Assert.Contains("Tham số", interpreted.DisplayText);
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public sealed class BackendResultInterpreterTests
 
         Assert.False(interpreted.IsSuccess);
         Assert.Equal("failed", interpreted.State);
-        Assert.Contains("前置检查", interpreted.DisplayText);
+        Assert.Contains("kiểm tra điều kiện", interpreted.DisplayText);
         Assert.Contains("no mailbox account was found", interpreted.DisplayText);
     }
 
@@ -333,7 +333,7 @@ public sealed class BackendResultInterpreterTests
 
         Assert.False(interpreted.IsSuccess);
         Assert.Equal("failed", interpreted.State);
-        Assert.Contains("运行时", interpreted.DisplayText);
+        Assert.Contains("runtime", interpreted.DisplayText);
     }
 
     [Fact]
@@ -412,7 +412,7 @@ public sealed class BackendResultInterpreterTests
         var cancelled = BackendResultInterpreter.Cancelled("test");
         Assert.False(cancelled.IsSuccess);
         Assert.Equal("cancelled", cancelled.State);
-        Assert.Contains("已取消", cancelled.DisplayText);
+        Assert.Contains("Đã hủy", cancelled.DisplayText);
     }
 
     [Fact]

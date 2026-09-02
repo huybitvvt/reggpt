@@ -1,5 +1,11 @@
-﻿namespace SmsWorkbench
+namespace SmsWorkbench
 {
+    public sealed record AccountPaymentCheckState(
+        string Status,
+        string OfferState,
+        string Error,
+        long CheckedAt);
+
     /// <summary>
     /// Window-independent interpretation of backend account JSON: plan type,
     /// quota labels, payment status, deactivation detection, and import state.
@@ -393,6 +399,194 @@
             }
             if (!string.IsNullOrWhiteSpace(BackendJson.GetString(data, "totp_secret"))) return true;
             return long.TryParse(BackendJson.GetString(data, "twofa_enrolled_at"), out long enrolledAt) && enrolledAt > 0;
+        }
+
+        public static IReadOnlyList<string> GetPaymentMethodBadges(Dictionary<string, object> data, string rawJson)
+        {
+            var badges = new List<string>();
+            if (data == null && string.IsNullOrWhiteSpace(rawJson)) return badges;
+
+            Dictionary<string, object> parsed = null;
+            if (!string.IsNullOrWhiteSpace(rawJson) && rawJson != "{}")
+            {
+                try
+                {
+                    parsed = BackendJson.TextToObject(rawJson);
+                }
+                catch
+                {
+                }
+            }
+
+            var source = parsed ?? data;
+            if (source == null) return badges;
+
+            AddBadgeValues(source, "payment_method_badges", badges, normalize: false);
+
+            Dictionary<string, object> capability = null;
+            if (BackendJson.TryGetMap(source, "payment_capability", out Dictionary<string, object> cap))
+            {
+                capability = cap;
+                AddBadgeValues(capability, "payment_method_badges", badges, normalize: false);
+                AddBadgeValues(capability, "badges", badges, normalize: false);
+            }
+
+            string currency = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "currency"),
+                BackendJson.GetString(capability, "currency"));
+            if (TryGetPaymentAmount(source, out long amountDue)
+                || TryGetPaymentAmount(capability, out amountDue)
+                || BackendJson.GetString(source, "offer_state").Equals("zero_due", StringComparison.OrdinalIgnoreCase)
+                || BackendJson.GetString(capability, "offer_state").Equals("zero_due", StringComparison.OrdinalIgnoreCase))
+            {
+                if (amountDue == 0 || BackendJson.GetString(source, "offer_state").Equals("zero_due", StringComparison.OrdinalIgnoreCase)
+                    || BackendJson.GetString(capability, "offer_state").Equals("zero_due", StringComparison.OrdinalIgnoreCase))
+                    AddTrialBadge(badges, currency);
+            }
+
+            AddBadgeValues(source, "payment_method_types", badges, normalize: true);
+            AddBadgeValues(source, "custom_payment_methods", badges, normalize: true);
+            AddBadgeValues(capability, "payment_method_types", badges, normalize: true);
+            AddBadgeValues(capability, "custom_payment_methods", badges, normalize: true);
+
+            string paymentMethod = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "payment_method"),
+                BackendJson.GetString(data, "payment_method"));
+            if (paymentMethod.Length > 0)
+            {
+                AddBadge(badges, NormalizeBadgeName(paymentMethod));
+            }
+
+            return badges;
+        }
+
+        public static AccountPaymentCheckState GetPaymentCheckState(
+            Dictionary<string, object> data,
+            string rawJson)
+        {
+            Dictionary<string, object> parsed = null;
+            if (!string.IsNullOrWhiteSpace(rawJson) && rawJson != "{}")
+            {
+                try
+                {
+                    parsed = BackendJson.TextToObject(rawJson);
+                }
+                catch
+                {
+                }
+            }
+
+            Dictionary<string, object> source = parsed ?? data
+                ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, object> capability = null;
+            BackendJson.TryGetMap(source, "payment_capability", out capability);
+
+            string status = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "payment_check_status"),
+                BackendJson.GetString(capability, "status"));
+            string offerState = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "offer_state"),
+                BackendJson.GetString(capability, "offer_state"));
+            string error = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "payment_check_error"),
+                BackendJson.GetString(capability, "error"));
+            string checkedAtText = BackendJson.FirstNonEmpty(
+                BackendJson.GetString(source, "payment_checked_at"),
+                BackendJson.GetString(capability, "checked_at"));
+            long.TryParse(checkedAtText, NumberStyles.Integer, CultureInfo.InvariantCulture, out long checkedAt);
+
+            if (status.Length == 0 && capability != null)
+            {
+                if (BackendJson.ParseBoolean(BackendJson.GetString(capability, "ok")))
+                    status = "completed";
+                else if (error.Length > 0)
+                    status = "failed";
+            }
+
+            return new AccountPaymentCheckState(
+                status.Trim().ToLowerInvariant(),
+                offerState.Trim().ToLowerInvariant(),
+                error.Trim(),
+                checkedAt);
+        }
+
+        private static void AddBadgeValues(Dictionary<string, object> source, string key, List<string> badges, bool normalize)
+        {
+            if (source == null || !source.TryGetValue(key, out object raw) || raw is not IEnumerable<object> values) return;
+            foreach (object item in values)
+            {
+                string value = Convert.ToString(item, CultureInfo.InvariantCulture)?.Trim() ?? "";
+                AddBadge(badges, normalize ? NormalizeBadgeName(value) : value);
+            }
+        }
+
+        private static void AddBadge(List<string> badges, string badge)
+        {
+            if (badge.Length > 0 && !badges.Contains(badge, StringComparer.OrdinalIgnoreCase)) badges.Add(badge);
+        }
+
+        private static void AddTrialBadge(List<string> badges, string currency)
+        {
+            string normalized = (currency ?? "").Trim().ToUpperInvariant();
+            string badge = normalized switch
+            {
+                "VND" or "VN" => "Trial · 0 đ",
+                "USD" or "" => "Trial · 0$",
+                _ => "Trial · 0 " + normalized
+            };
+            if (badges.Contains(badge, StringComparer.OrdinalIgnoreCase)) return;
+            badges.Insert(0, badge);
+        }
+
+        private static bool TryGetPaymentAmount(Dictionary<string, object> source, out long amount)
+        {
+            amount = 0;
+            if (source == null) return false;
+            foreach (string key in new[] { "amount_due", "amount_minor", "amount" })
+            {
+                if (!source.TryGetValue(key, out object raw) || raw == null) continue;
+                if (raw is long longValue)
+                {
+                    amount = longValue;
+                    return true;
+                }
+                if (raw is int intValue)
+                {
+                    amount = intValue;
+                    return true;
+                }
+                if (long.TryParse(Convert.ToString(raw, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out amount))
+                    return true;
+            }
+            return false;
+        }
+
+        public static string NormalizeBadgeName(string method)
+        {
+            string value = (method ?? "").Trim().ToLowerInvariant().Replace("-", "_").Replace(" ", "_");
+            return value switch
+            {
+                "card" or "direct_card" => "Card",
+                "apple_pay" or "applepay" => "Apple Pay",
+                "google_pay" or "googlepay" => "Google Pay",
+                "link" => "Link",
+                "momo" => "MoMo",
+                "paypal" => "PayPal",
+                "gopay" => "GoPay",
+                "gcash" => "GCash",
+                "grabpay" => "GrabPay",
+                "upi" => "UPI",
+                "kakao" or "kakao_pay" => "Kakao Pay",
+                "naver" or "naver_pay" => "Naver Pay",
+                "pix" => "PIX",
+                "ideal" => "iDEAL",
+                "blik" => "BLIK",
+                "twint" => "TWINT",
+                "qris" => "QRIS",
+                "bizum" => "Bizum",
+                "custom_payment_method" => "",
+                _ => method?.Trim() ?? ""
+            };
         }
     }
 }

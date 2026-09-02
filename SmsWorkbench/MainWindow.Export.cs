@@ -55,7 +55,38 @@
                 ExportAccountsJson(rows);
                 return;
             }
+            if (format.Equals("getsession", StringComparison.OrdinalIgnoreCase))
+            {
+                ExportGetSessionAccounts(rows);
+                return;
+            }
             ExportAccountsConvertedJson(rows, format);
+        }
+
+        private void ExportFilteredLoginAccounts_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedFilters = PaymentFilterChips.Where(chip => chip.IsSelected).ToList();
+            if (selectedFilters.Count == 0)
+            {
+                ShowThemedInfoDialog(
+                    "Xuất theo bộ lọc",
+                    "Hãy chọn ít nhất một thẻ lọc như Apple Pay, MoMo hoặc Trial trước khi xuất.");
+                return;
+            }
+
+            List<PoolRow> rows = allRows
+                .Where(FilterRow)
+                .Where(row => !string.IsNullOrWhiteSpace(row.Identifier))
+                .GroupBy(row => row.Identifier.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            if (rows.Count == 0)
+            {
+                ShowThemedInfoDialog("Xuất theo bộ lọc", "Không có tài khoản nào khớp bộ lọc hiện tại.");
+                return;
+            }
+
+            RunUiTask(() => ExportFilteredLoginAccountsAsync(rows, selectedFilters));
         }
 
         private List<PoolRow> ExportCandidateRows()
@@ -108,6 +139,127 @@
 
         private void ExportAccountsJson(List<PoolRow> rows)
             => RunUiTask(() => ExportAccountsJsonAsync(rows));
+
+        private void ExportGetSessionAccounts(List<PoolRow> rows)
+            => RunUiTask(() => ExportGetSessionAccountsAsync(rows));
+
+        private async Task ExportGetSessionAccountsAsync(List<PoolRow> rows)
+        {
+            var lines = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int skipped = 0;
+            foreach (PoolRow row in rows)
+            {
+                var data = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                if (!await TryLoadAccountDataForRowAsync(row, data))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                if (!AccountCredentialExport.TryBuildLoginLine(
+                        data,
+                        row?.Identifier,
+                        requireTotp: false,
+                        out string line,
+                        out _))
+                {
+                    skipped++;
+                    continue;
+                }
+                string email = line[..line.IndexOf('|')];
+                if (seen.Add(email)) lines.Add(line);
+            }
+
+            if (lines.Count == 0)
+            {
+                ShowThemedInfoDialog(
+                    "Xuất Get Session",
+                    "Không có tài khoản đăng nhập bằng mật khẩu để xuất. Tài khoản passwordless cũ không thể chuyển thành combo email|password.");
+                return;
+            }
+
+            string outputDir = Path.Combine(rootDir, "runtime");
+            Directory.CreateDirectory(outputDir);
+            string outputPath = Path.Combine(
+                outputDir,
+                "get-session-" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".txt");
+            await Task.Run(() => File.WriteAllLines(outputPath, lines, new UTF8Encoding(false)));
+            Log("Get Session export wrote " + lines.Count + " account(s), skipped " + skipped + ": " + outputPath);
+            ShowExportCompleteDialog(
+                outputPath,
+                lines.Count,
+                skipped,
+                "GET SESSION TXT",
+                "email|mật khẩu ChatGPT|TOTP secret; nếu chưa bật 2FA sẽ xuất email|mật khẩu");
+        }
+
+        private async Task ExportFilteredLoginAccountsAsync(
+            List<PoolRow> rows,
+            List<AccountFilterChip> selectedFilters)
+        {
+            var lines = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int missingPassword = 0;
+            int missingTotp = 0;
+            int unreadable = 0;
+
+            foreach (PoolRow row in rows)
+            {
+                var data = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                if (!await TryLoadAccountDataForRowAsync(row, data))
+                {
+                    unreadable++;
+                    continue;
+                }
+                if (!AccountCredentialExport.TryBuildLoginLine(
+                        data,
+                        row.Identifier,
+                        requireTotp: true,
+                        out string line,
+                        out string missingField))
+                {
+                    if (missingField == "totp_secret") missingTotp++;
+                    else if (missingField == "password") missingPassword++;
+                    else unreadable++;
+                    continue;
+                }
+
+                string email = line[..line.IndexOf('|')];
+                if (seen.Add(email)) lines.Add(line);
+            }
+
+            if (lines.Count == 0)
+            {
+                ShowThemedInfoDialog(
+                    "Xuất theo bộ lọc",
+                    "Có tài khoản khớp bộ lọc nhưng không có dòng nào đủ cả email, mật khẩu và TOTP secret. " +
+                    $"Thiếu mật khẩu: {missingPassword}; thiếu 2FA: {missingTotp}; không đọc được: {unreadable}.");
+                return;
+            }
+
+            string filterSlug = string.Join(
+                "-",
+                selectedFilters.Select(chip => Regex.Replace(chip.Key.ToLowerInvariant(), "[^a-z0-9]+", "-")));
+            string outputDir = Path.Combine(rootDir, "runtime", "filtered_accounts");
+            Directory.CreateDirectory(outputDir);
+            string outputPath = Path.Combine(
+                outputDir,
+                $"accounts-{filterSlug}-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            await Task.Run(() => File.WriteAllLines(outputPath, lines, new UTF8Encoding(false)));
+
+            int skipped = missingPassword + missingTotp + unreadable;
+            string labels = string.Join(" + ", selectedFilters.Select(chip => chip.Label));
+            Log(
+                $"Filtered credential export ({labels}) wrote {lines.Count} account(s), skipped {skipped}: " +
+                outputPath);
+            ShowExportCompleteDialog(
+                outputPath,
+                lines.Count,
+                skipped,
+                "TXT THEO BỘ LỌC",
+                $"Bộ lọc {labels}; email|mật khẩu|TOTP secret. Thiếu mật khẩu: {missingPassword}; thiếu 2FA: {missingTotp}; không đọc được: {unreadable}");
+        }
 
         private async Task ExportAccountsJsonAsync(List<PoolRow> rows)
         {
@@ -244,9 +396,10 @@
             Grid.SetRow(header, 0);
             root.Children.Add(header);
 
-            var combo = new ComboBox { SelectedIndex = 2, Margin = new Thickness(0, 0, 0, 16) };
+            var combo = new ComboBox { SelectedIndex = 3, Margin = new Thickness(0, 0, 0, 16) };
             combo.Items.Add(new ComboBoxItem { Content = "TXT - email----mật khẩu----client ID----refresh token", Tag = "txt" });
             combo.Items.Add(new ComboBoxItem { Content = "JSON gốc - session/auth_session", Tag = "json" });
+            combo.Items.Add(new ComboBoxItem { Content = "Get Session TXT - email|mật khẩu ChatGPT|TOTP", Tag = "getsession" });
             combo.Items.Add(new ComboBoxItem { Content = "CPA JSON", Tag = "cpa" });
             combo.Items.Add(new ComboBoxItem { Content = "Sub2API JSON", Tag = "sub2api" });
             combo.Items.Add(new ComboBoxItem { Content = "Cockpit JSON", Tag = "cockpit" });
@@ -300,6 +453,7 @@
             if (value == "axonhub") return "AxonHub JSON";
             if (value == "codexmanager") return "Codex-Manager JSON";
             if (value == "json") return "JSON gốc";
+            if (value == "getsession") return "GET SESSION TXT";
             if (value == "txt") return "TXT";
             return "CPA JSON";
         }
@@ -313,6 +467,7 @@
             if (value == "codex") return "Cấu trúc Codex auth.json do session_converter.py tạo";
             if (value == "axonhub") return "Cấu trúc AxonHub do session_converter.py tạo; khi thiếu RT sẽ ghi placeholder";
             if (value == "codexmanager") return "Cấu trúc Codex-Manager do session_converter.py tạo";
+            if (value == "getsession") return "Combo email|mật khẩu ChatGPT|TOTP để dán vào get_session_tool";
             return "CPA JSON do session_converter.py tạo; khi thiếu id_token sẽ tạo trường tương thích";
         }
 

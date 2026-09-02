@@ -1,4 +1,4 @@
-﻿namespace SmsWorkbench
+namespace SmsWorkbench
 {
     public partial class MainWindow
     {
@@ -16,10 +16,39 @@
 
             if (scope == "Có dùng thử" && !PromotionStatusPresentation.IsTrialEligible(row.PromotionStatus)) return false;
             if (scope == "Chờ xử lý" && !IsAttentionStatus(row.Status)) return false;
+            if (!AccountPaymentFilter.MatchesAll(
+                    row,
+                    PaymentFilterChips.Where(chip => chip.IsSelected).Select(chip => chip.Key)))
+                return false;
             if (term.Length == 0) return true;
 
             string text = (row.Identifier + " " + row.AccountType + " " + row.Status + " " + row.Notes).ToLowerInvariant();
             return text.Contains(term);
+        }
+
+        private void PaymentFilterChip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggle
+                && toggle.DataContext is AccountFilterChip chip)
+            {
+                chip.IsSelected = toggle.IsChecked == true;
+            }
+            OnPropertyChanged(nameof(PaymentFilterSummary));
+            OnPropertyChanged(nameof(HasPaymentFilters));
+            currentPage = 1;
+            RefreshPagedRows();
+        }
+
+        private void ClearPaymentFilters_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (AccountFilterChip chip in PaymentFilterChips)
+            {
+                chip.IsSelected = false;
+            }
+            OnPropertyChanged(nameof(PaymentFilterSummary));
+            OnPropertyChanged(nameof(HasPaymentFilters));
+            currentPage = 1;
+            RefreshPagedRows();
         }
 
         private bool IsMailboxPoolLikeRow(PoolRow row)
@@ -358,6 +387,7 @@
                 refreshStatus = "oauth_present";
             }
             string provider = GetString(data, "mailbox_provider");
+            AccountPaymentCheckState paymentCheck = AccountStatusInterpreter.GetPaymentCheckState(data, rawJson);
             var row = new PoolRow
             {
                 Id = "DB" + GetString(data, "id"),
@@ -378,6 +408,10 @@
                     GetString(data, "promotion_status"),
                     AccountStatusInterpreter.DisplayPayPalStatus(paypalStatus, paypalOk, paypalUrl, paymentMethod),
                     AccountStatusInterpreter.GetPaypalAmount(rawJson)),
+                PaymentCheckStatus = paymentCheck.Status,
+                OfferState = paymentCheck.OfferState,
+                PaymentCheckError = paymentCheck.Error,
+                PaymentCheckedAt = paymentCheck.CheckedAt,
                 RefreshTokenStatus = AccountStatusInterpreter.DisplayRtStatus(refreshStatus),
                 TwoFactorStatus = AccountStatusInterpreter.HasTwoFactor(data) ? "Đã thiết lập" : "Chưa thiết lập",
                 HasAccessToken = hasAccess,
@@ -388,7 +422,8 @@
                 Notes = GetString(data, "json_path").Length > 0 ? GetString(data, "json_path") : databasePath,
                 SourcePath = databasePath,
                 RawLine = GetString(data, "id"),
-                MailboxProvider = provider
+                MailboxProvider = provider,
+                PaymentMethodBadges = AccountStatusInterpreter.GetPaymentMethodBadges(data, rawJson)
             };
             allRows.Add(row);
         }

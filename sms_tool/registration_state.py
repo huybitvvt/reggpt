@@ -26,6 +26,8 @@ class RegistrationState(str, Enum):
     AUTH_SESSION = "auth_session"
     CODEX_OAUTH = "codex_oauth"
     ACCESS_TOKEN_PROBE = "access_token_probe"
+    DETECT_OFFER = "detect_offer"
+    DETECT_PAYMENT_METHODS = "detect_payment_methods"
     TOTP_ENROLL = "totp_enroll"
     FINALIZE = "finalize"
     COMPLETED = "completed"
@@ -209,12 +211,12 @@ def _normalize_registration_mode(value=None):
     if not raw:
         value = current_config_data().get("email_registration")
         cfg = value if isinstance(value, Mapping) else {}
-        raw = str(cfg.get("registration_mode") or cfg.get("signup_mode") or "passwordless").strip().lower().replace("-", "_")
+        raw = str(cfg.get("registration_mode") or cfg.get("signup_mode") or "password").strip().lower().replace("-", "_")
     if raw in {"password", "password_signup", "user_register", "legacy"}:
         return "password"
     if raw in {"passwordless", "passwordless_signup", "login_or_signup", "har"}:
         return "passwordless"
-    return "passwordless"
+    return "password"
 
 
 def _stored_registration_password(email):

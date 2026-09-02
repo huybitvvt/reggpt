@@ -169,6 +169,67 @@ def check_registered_promotions(emails, workers=4, proxy=None, timeout=20):
     return report
 
 
+def _inline_promotion_results(results: list[Any]) -> dict[str, dict[str, Any]]:
+    """Return completed inline checks keyed by normalized email.
+
+    Get Session failures are included so registration never silently falls
+    back to the legacy ``accounts/check`` checker after already attempting the
+    integrated checkout-capability check.
+    """
+    output: dict[str, dict[str, Any]] = {}
+    for data in results:
+        if not isinstance(data, dict) or not data.get("success"):
+            continue
+        email = str(data.get("email") or "").strip().lower()
+        probe = data.get("promotion_result")
+        if not isinstance(probe, dict):
+            promotion = data.get("promotion")
+            probe = promotion.get("last_result") if isinstance(promotion, dict) else None
+        if not email or not isinstance(probe, dict):
+            continue
+        is_get_session = probe.get("source") == "get_session_payment_check"
+        if not probe.get("ok") and not is_get_session:
+            continue
+        output[email] = {
+            "email": email,
+            "ok": bool(probe.get("ok")),
+            "promotion_status": str(
+                data.get("promotion_status") or probe.get("promotion_status") or ""
+            ),
+            "persisted": True,
+            "probe": probe,
+        }
+    return output
+
+
+def _merge_promotion_reports(
+    inline: dict[str, dict[str, Any]],
+    fallback: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    fallback = fallback if isinstance(fallback, Mapping) else {}
+    if not inline:
+        return dict(fallback)
+    combined = list(inline.values())
+    for item in fallback.get("results", []):
+        if isinstance(item, dict):
+            combined.append(item)
+    success = sum(1 for item in combined if item.get("ok"))
+    trial_eligible = sum(
+        1
+        for item in combined
+        if isinstance(item.get("probe"), dict)
+        and bool(item["probe"].get("plus_trial_eligible"))
+    )
+    return {
+        "ok": success == len(combined) if combined else True,
+        "total": len(combined),
+        "success": success,
+        "failed": len(combined) - success,
+        "trial_eligible": trial_eligible,
+        "results": combined,
+    }
+
+
 _PERSISTENCE_KEY = "_registration_persistence"
 
 
@@ -392,15 +453,25 @@ def save_registration_results(
 
     promotion_report = None
     if getattr(args, "check_promotion_after_registration", False):
-        promotion_report = ctx.check_registered_promotions(
-            import_emails,
-            workers=max(1, int(getattr(args, "workers", 4) or 4)),
-            # Post-registration promotion checks use the account-health lane.
-            # Passing the signup proxy here defeats that isolation and can
-            # immediately re-use a contaminated registration exit.
-            proxy=None,
-            timeout=max(5, int(getattr(args, "refresh_timeout", 20) or 20)),
-        )
+        inline = _inline_promotion_results(results)
+        pending = [email for email in unique_emails(import_emails) if email not in inline]
+        fallback = None
+        if pending:
+            fallback = ctx.check_registered_promotions(
+                pending,
+                workers=max(1, int(getattr(args, "workers", 4) or 4)),
+                # A failed/missing inline probe falls back to the isolated
+                # account-health lane instead of repeating every successful
+                # request on a new proxy.
+                proxy=None,
+                timeout=max(5, int(getattr(args, "refresh_timeout", 20) or 20)),
+            )
+        promotion_report = _merge_promotion_reports(inline, fallback)
+        if inline:
+            print(
+                "[*] Promotion check: "
+                f"reused {len(inline)} inline result(s), fallback={len(pending)}"
+            )
 
     if getattr(args, "import_cpa", False):
         ctx.import_registered_accounts(args, import_emails)

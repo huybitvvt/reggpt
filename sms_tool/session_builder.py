@@ -29,6 +29,33 @@ def build_session_file(data):
     response = data.get("response") or {}
     auth_session = data.get("auth_session") or response.get("auth_session") or {}
     paypal = data.get("paypal") or {}
+    payment_capability = data.get("payment_capability") or response.get("payment_capability") or {}
+    if not isinstance(payment_capability, dict):
+        payment_capability = {}
+    payment_method_badges = data.get("payment_method_badges") or payment_capability.get("payment_method_badges") or payment_capability.get("badges") or []
+    payment_method_types = data.get("payment_method_types") or payment_capability.get("payment_method_types") or []
+    custom_payment_methods = data.get("custom_payment_methods") or payment_capability.get("custom_payment_methods") or []
+    promotion_result = data.get("promotion_result") or response.get("promotion") or {}
+    if not isinstance(promotion_result, dict):
+        promotion_result = {}
+    promotion = data.get("promotion") or {}
+    if not isinstance(promotion, dict):
+        promotion = {}
+    promotion_status = str(
+        data.get("promotion_status")
+        or promotion.get("status")
+        or promotion_result.get("promotion_status")
+        or ""
+    )
+    if promotion_result and not promotion:
+        promotion = {
+            "status": promotion_status,
+            "updated_at": int(time.time()),
+            "last_result": promotion_result,
+        }
+    amount_due = data.get("amount_due")
+    if amount_due is None:
+        amount_due = payment_capability.get("amount_due", payment_capability.get("amount_minor"))
 
     # --- token resolution (priority: data → response → nested → auth_session) ---
     session_token = (
@@ -102,6 +129,7 @@ def build_session_file(data):
 
     return {
         "email": data.get("email") or mailbox.get("email") or "",
+        "plan_type": data.get("plan_type") or promotion_result.get("current_plan_type") or "unknown",
         "phone": data.get("phone", ""),
         "password": data.get("password", ""),
         "session_token": session_token or "",
@@ -115,6 +143,19 @@ def build_session_file(data):
         "auth_session": auth_session,
         "paypal": paypal,
         "payment_method": payment_method,
+        "promotion_status": promotion_status,
+        "promotion_result": promotion_result,
+        "promotion": promotion,
+        "payment_capability": payment_capability,
+        "payment_method_badges": list(payment_method_badges) if isinstance(payment_method_badges, (list, tuple)) else [],
+        "payment_method_types": list(payment_method_types) if isinstance(payment_method_types, (list, tuple)) else [],
+        "custom_payment_methods": list(custom_payment_methods) if isinstance(custom_payment_methods, (list, tuple)) else [],
+        "amount_due": amount_due,
+        "currency": data.get("currency") or payment_capability.get("currency") or "",
+        "offer_state": data.get("offer_state") or payment_capability.get("offer_state") or "",
+        "payment_check_status": data.get("payment_check_status") or payment_capability.get("status") or "",
+        "payment_check_error": data.get("payment_check_error") or payment_capability.get("error") or "",
+        "payment_checked_at": data.get("payment_checked_at") or payment_capability.get("checked_at") or 0,
         "paypal_status": paypal_status,
         "registration_mode": data.get("registration_mode", ""),
         "registration_driver": data.get("registration_driver", ""),

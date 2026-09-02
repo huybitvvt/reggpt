@@ -115,6 +115,20 @@ namespace SmsWorkbench
         private static bool IsSupportedImportLine(string line)
         {
             if (TryParseICloudUrlLine(line, out _, out _)) return true;
+            if (line.StartsWith("gmail://", StringComparison.OrdinalIgnoreCase))
+            {
+                string payload = line.Substring("gmail://".Length);
+                string[] gmailParts = payload.Split(new[] { "----" }, StringSplitOptions.None);
+                if (gmailParts.Length == 2)
+                    return gmailParts[0].Trim().Length > 0 && gmailParts[1].Trim().Length > 0;
+                if (gmailParts.Length == 3)
+                    return gmailParts[0].Trim().Length > 0 && gmailParts[2].Trim().Length > 0;
+                return gmailParts.Length >= 4
+                    && gmailParts[0].Trim().Length > 0
+                    && gmailParts[1].Trim().Length > 0
+                    && gmailParts[2].Trim().Length > 0
+                    && gmailParts[3].Trim().Length > 0;
+            }
             string[] parts = line.Split(new[] { "----" }, 4, StringSplitOptions.None);
             return parts.Length >= 4;
         }

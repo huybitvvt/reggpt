@@ -14,12 +14,13 @@ public sealed class BackendCommandPlannerTests
             proxyPool: new[] { "http://proxy1:8080", "http://proxy2:8080" },
             workers: 3);
 
-        Assert.Equal("邮箱池注册", plan.TaskName);
+        Assert.Equal("Đăng ký từ pool email", plan.TaskName);
         Assert.Contains("--count", plan.Arguments);
         Assert.Contains("5", plan.Arguments);
         Assert.Contains("--workers", plan.Arguments);
         Assert.Contains("3", plan.Arguments);
         Assert.Contains("--no-phone-reuse", plan.Arguments);
+        Assert.Contains("--check-promotion-after-registration", plan.Arguments);
         Assert.Contains("--proxy", plan.Arguments);
         Assert.Contains("http://proxy1:8080", plan.Arguments);
     }
@@ -30,6 +31,7 @@ public sealed class BackendCommandPlannerTests
         var plan = BackendCommandPlanner.CreatePoolRegistration(count: 1, proxyPool: Array.Empty<string>());
         Assert.DoesNotContain("--proxy", plan.Arguments);
         Assert.DoesNotContain("--proxy-pool", plan.Arguments);
+        Assert.Contains("--check-promotion-after-registration", plan.Arguments);
     }
 
     [Fact]
@@ -122,7 +124,7 @@ public sealed class BackendCommandPlannerTests
             count: 2,
             proxyPool: new[] { "http://proxy:8080" });
 
-        Assert.Equal("手机号注册 (SMSBower)", plan.TaskName);
+        Assert.Equal("Đăng ký bằng số điện thoại (SMSBower)", plan.TaskName);
         Assert.Contains("--phone-register", plan.Arguments);
         Assert.Contains("--count", plan.Arguments);
         Assert.Contains("2", plan.Arguments);
@@ -137,7 +139,7 @@ public sealed class BackendCommandPlannerTests
             workers: 3,
             proxyPool: Array.Empty<string>());
 
-        Assert.Equal("CFWorker邮箱注册", plan.TaskName);
+        Assert.Equal("Đăng ký email CFWorker", plan.TaskName);
         Assert.Contains("--buy-cfworker-mailbox", plan.Arguments);
         Assert.Contains("--cfworker-domain", plan.Arguments);
         Assert.Contains("example.cloud", plan.Arguments);
@@ -180,7 +182,7 @@ public sealed class BackendCommandPlannerTests
             count: 5,
             proxyPool: Array.Empty<string>());
 
-        Assert.Contains("重新注册失败账号", plan.TaskName);
+        Assert.Contains("Đăng ký lại tài khoản thất bại", plan.TaskName);
         Assert.Contains("5", plan.TaskName);
         Assert.Contains("--chatai-mailbox-file", plan.Arguments);
     }
@@ -372,7 +374,7 @@ public sealed class BackendCommandPlannerTests
     public void CreateRebuildSqlite_HasMinimalArgs()
     {
         var plan = BackendCommandPlanner.CreateRebuildSqlite();
-        Assert.Equal("重建SQLite索引", plan.TaskName);
+        Assert.Equal("Tạo lại index SQLite", plan.TaskName);
         Assert.Contains("--rebuild-sqlite", plan.Arguments);
         Assert.Single(plan.Arguments);
     }

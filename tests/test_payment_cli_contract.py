@@ -21,6 +21,37 @@ def test_qr_only_registration_session_is_marked_ready():
     assert session["paypal_status"] == "qr_ready"
 
 
+def test_registration_session_keeps_payment_detection_fields():
+    capability = {
+        "ok": True,
+        "status": "completed",
+        "checked_at": 1788240000,
+        "error": "",
+        "amount_minor": 0,
+        "currency": "VND",
+        "offer_state": "zero_due",
+        "payment_method_types": ["card", "momo"],
+        "custom_payment_methods": ["gcash"],
+        "badges": ["Trial · 0 đ", "Card", "MoMo", "GCash"],
+    }
+    session = registration._build_session_file({
+        "email": "badges@example.com",
+        "access_token": "at-test",
+        "payment_capability": capability,
+    })
+
+    assert session["payment_capability"] == capability
+    assert session["payment_method_badges"] == capability["badges"]
+    assert session["payment_method_types"] == ["card", "momo"]
+    assert session["custom_payment_methods"] == ["gcash"]
+    assert session["amount_due"] == 0
+    assert session["currency"] == "VND"
+    assert session["offer_state"] == "zero_due"
+    assert session["payment_check_status"] == "completed"
+    assert session["payment_check_error"] == ""
+    assert session["payment_checked_at"] == 1788240000
+
+
 def test_blik_batch_requires_the_single_account_command():
     args = SimpleNamespace(
         payment_method="blik",

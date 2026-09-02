@@ -232,8 +232,8 @@ class RegistrationConcurrencyTests(unittest.TestCase):
         self.assertTrue(presence["oai_did"])
         self.assertTrue(presence["nextauth_state"])
 
-    def test_registration_mode_defaults_to_passwordless_and_keeps_legacy_escape(self):
-        self.assertEqual(_normalize_registration_mode(None), "passwordless")
+    def test_registration_mode_defaults_to_password_and_keeps_passwordless_escape(self):
+        self.assertEqual(_normalize_registration_mode(None), "password")
         self.assertEqual(_normalize_registration_mode("har"), "passwordless")
         self.assertEqual(_normalize_registration_mode("passwordless_signup"), "passwordless")
         self.assertEqual(_normalize_registration_mode("legacy"), "password")

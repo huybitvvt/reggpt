@@ -291,24 +291,55 @@ namespace SmsWorkbench
 
         private async Task DeleteSelectedAsync()
         {
-            var selected = SelectedEmailRowsOrNotify("Xóa");
-            if (selected.Count == 0) return;
+            var selected = SelectedRowsOrCurrent()
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Identifier))
+                .ToList();
+            if (selected.Count == 0)
+            {
+                ShowEmailSelectionRequired("Xóa");
+                return;
+            }
             if (!await ShowDeleteConfirmDialog(selected.Count)) return;
             BackendCommandPlan plan = null;
+            int localRemoved = 0;
             try
             {
-                plan = BackendCommandPlanner.CreateBatchDeleteAccounts(
-                    selected.Select(row => NormalizeEmailKey(row.Identifier)).ToArray(),
-                    workers: Math.Min(8, Math.Max(1, selected.Count)));
-                BackendCommandResult backend = await backendTasks.RunAsync(
-                    BackendCommand.Create(plan.TaskName, plan.Arguments.ToList(), plan.TimeoutMilliseconds ?? 120000));
-                int failed = CountBatchDeleteFailures(backend, selected.Count);
+                var mailboxRows = selected.Where(IsMailboxPoolFileRow).ToList();
+                var accountRows = selected.Except(mailboxRows).ToList();
+
+                localRemoved = DeleteMailboxPoolRows(mailboxRows);
+
+                int failed = 0;
+                if (accountRows.Count > 0)
+                {
+                    var accountEmails = accountRows
+                        .Select(row => NormalizeEmailKey(row.Identifier))
+                        .Where(email => email.Length > 0)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    plan = BackendCommandPlanner.CreateBatchDeleteAccounts(
+                        accountEmails,
+                        workers: Math.Min(8, Math.Max(1, accountEmails.Length)));
+                    BackendCommandResult backend = await backendTasks.RunAsync(
+                        BackendCommand.Create(plan.TaskName, plan.Arguments.ToList(), plan.TimeoutMilliseconds ?? 120000));
+                    failed = CountBatchDeleteFailures(backend, accountEmails.Length);
+                }
+
+                int mailboxFailed = Math.Max(0, mailboxRows.Count - localRemoved);
+                failed += mailboxFailed;
                 if (failed > 0)
                 {
                     await DialogFactory.ShowInfoAsync(
                         this,
                         "Xóa chưa hoàn tất",
                         failed + " bản ghi chưa xóa hoàn toàn. Vui lòng xem log chạy.");
+                }
+                else
+                {
+                    string message = localRemoved > 0
+                        ? $"Đã xóa {localRemoved} dòng mail khỏi file nguồn."
+                        : "Đã xóa các mục đã chọn.";
+                    Log(message);
                 }
             }
             catch (Exception ex)
@@ -325,6 +356,42 @@ namespace SmsWorkbench
                 }
                 RefreshPools();
             }
+        }
+
+        private bool IsMailboxPoolFileRow(PoolRow row)
+        {
+            if (row == null) return false;
+            string path = FirstNonEmpty(row.SourcePath, row.Notes);
+            if (path.Length == 0 || !File.Exists(path)) return false;
+            string extension = Path.GetExtension(path);
+            if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".sqlite3", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".db", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            return MailboxPoolFileStore.IsMailboxPoolLike(row.AccountType, row.MailboxProvider)
+                && FirstNonEmpty(row.MailboxLine, row.RawLine).Length > 0;
+        }
+
+        private int DeleteMailboxPoolRows(IEnumerable<PoolRow> rows)
+        {
+            int removed = 0;
+            foreach (PoolRow row in rows)
+            {
+                string path = FirstNonEmpty(row.SourcePath, row.Notes);
+                string exactLine = FirstNonEmpty(row.MailboxLine, row.RawLine);
+                int count = MailboxPoolFileStore.DeleteMatchingLines(
+                    path,
+                    NormalizeEmailKey(row.Identifier),
+                    new[] { exactLine });
+                removed += Math.Min(1, count);
+                if (count > 0)
+                    Log("Đã xóa mail khỏi pool: " + row.Identifier);
+                else
+                    Log("Không tìm thấy dòng mail để xóa: " + row.Identifier);
+            }
+            return removed;
         }
 
         private static int CountBatchDeleteFailures(BackendCommandResult backend, int expected)

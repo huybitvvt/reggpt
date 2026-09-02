@@ -244,7 +244,7 @@ def build_parser():
     parser.add_argument("--phone-register", action="store_true", help="Register with phone number via SMSBower instead of email")
     parser.add_argument("--smsbower-country", default=None, help="SMSBower country ID for phone registration (default: from config)")
     parser.add_argument("--skip-paypal-link", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--registration-mode", choices=["passwordless", "password", "har", "legacy"], default=None, help="Registration auth mode: passwordless/HAR login_or_signup (default) or legacy password")
+    parser.add_argument("--registration-mode", choices=["passwordless", "password", "har", "legacy"], default=None, help="Registration auth mode: password account (default) or passwordless/HAR login_or_signup")
     parser.add_argument("--registration-driver", choices=["protocol", "playwright", "roxy", "cloak", "camoufox", "adspower"], default=None, help="Registration driver (default: protocol)")
     parser.add_argument("--browser-headless", dest="browser_headless", action="store_true", default=None, help="Run Playwright registration headless")
     parser.add_argument("--browser-visible", dest="browser_headless", action="store_false", help="Run Playwright registration with a visible browser")

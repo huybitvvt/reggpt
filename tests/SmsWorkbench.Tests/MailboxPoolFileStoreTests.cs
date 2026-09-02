@@ -6,9 +6,9 @@ namespace SmsWorkbench.Tests;
 public sealed class MailboxPoolFileStoreTests
 {
     [Theory]
-    [InlineData(true, "200", "已获取")]
-    [InlineData(true, "401", "401失效")]
-    [InlineData(false, "401", "未获取")]
+    [InlineData(true, "200", "Đã lấy")]
+    [InlineData(true, "401", "401 hết hiệu lực")]
+    [InlineData(false, "401", "Chưa lấy")]
     public void AccessTokenDisplayReflectsProbeState(bool hasAccessToken, string statusCode, string expected)
     {
         Assert.Equal(expected, AccessTokenState.Display(hasAccessToken, statusCode));
@@ -85,6 +85,31 @@ public sealed class MailboxPoolFileStoreTests
             Assert.Equal(2, skipped);
             Assert.Equal(new[] { icloud, chatai }, File.ReadAllLines(target, Encoding.UTF8));
             Assert.False(File.ReadAllBytes(target).Take(3).SequenceEqual(new byte[] { 0xEF, 0xBB, 0xBF }));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void ImportSupportedLinesAcceptsGmailAppPasswordFormats()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "smsworkbench-gmail-import-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string target = Path.Combine(root, "mailbox_tokens.txt");
+            string withLoginPassword = "gmail://user@gmail.com----login-password----abcd efgh ijkl mnop";
+            string appPasswordOnly = "gmail://other@gmail.com----qrst uvwx yzab cdef";
+
+            (int imported, int skipped) = MailboxPoolFileStore.ImportSupportedLines(
+                target,
+                new[] { withLoginPassword, appPasswordOnly, "gmail://broken@gmail.com----" });
+
+            Assert.Equal(2, imported);
+            Assert.Equal(1, skipped);
+            Assert.Equal(new[] { withLoginPassword, appPasswordOnly }, File.ReadAllLines(target, Encoding.UTF8));
         }
         finally
         {

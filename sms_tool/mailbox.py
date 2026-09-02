@@ -713,7 +713,15 @@ def _fetch_mailbox_messages(
     runtime_config: ConfigInput = None,
     registry=None,
 ):
-    proxy = _resolve_mailbox_proxy(proxy, runtime_config)
+    provider = str(getattr(mailbox, "provider", "") or "")
+    # ReMail is an independent mailbox service and must not inherit the
+    # registration egress. Only its explicitly configured mailbox proxy is
+    # allowed; other providers preserve their existing explicit-proxy path.
+    proxy = (
+        _configured_mailbox_proxy(runtime_config)
+        if provider == "remail"
+        else _resolve_mailbox_proxy(proxy, runtime_config)
+    )
     cfg = _email_cfg(runtime_config)
 
     # Try registered provider strategies in order (cfworker → remail → icloud → gmail → chongzhi → Graph API fallback)
@@ -774,7 +782,14 @@ def _poll_email_otp(
             )
 
     issued_after_unix = _provider_otp_issued_after(mailbox, issued_after_unix, runtime_config)
-    proxy = _resolve_mailbox_proxy(proxy, runtime_config)
+    # Keep ReMail mailbox traffic separate from the OpenAI registration
+    # egress. It may use proxy.mailbox, but never an implicit registration
+    # proxy passed by the registration pipeline.
+    proxy = (
+        _configured_mailbox_proxy(runtime_config)
+        if provider == "remail"
+        else _resolve_mailbox_proxy(proxy, runtime_config)
+    )
 
     # Try registered OTP pollers in order (cfworker -> remail -> Graph API fallback graph_otp_poll)
     poller = mailbox_strategies.resolve_otp_poller(mailbox, cfg, registry=registry)

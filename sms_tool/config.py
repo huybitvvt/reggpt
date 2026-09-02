@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -438,6 +439,19 @@ def validate_config(config: Mapping[str, Any], *, workflow: str | None = None) -
         ), "registration", errors)
         if "browser_headless" in registration and not isinstance(registration.get("browser_headless"), bool):
             errors.append("registration.browser_headless must be a boolean")
+        if "detect_payment_methods" in registration and not isinstance(registration.get("detect_payment_methods"), bool):
+            errors.append("registration.detect_payment_methods must be a boolean")
+        if "detect_offer" in registration and not isinstance(registration.get("detect_offer"), bool):
+            errors.append("registration.detect_offer must be a boolean")
+        _validate_positive_numbers(
+            registration,
+            ("offer_check_timeout_seconds",),
+            "registration",
+            errors,
+        )
+        payment_country = str(registration.get("payment_country") or "").strip().upper()
+        if payment_country and not re.fullmatch(r"[A-Z]{2}", payment_country):
+            errors.append("registration.payment_country must be an ISO-3166 alpha-2 country code")
         for key in ("browser_locale", "browser_timezone"):
             if key in registration and not str(registration.get(key) or "").strip():
                 errors.append(f"registration.{key} must not be blank")
@@ -477,7 +491,7 @@ def validate_config(config: Mapping[str, Any], *, workflow: str | None = None) -
                 "sentinel", "identity_ready", "auth_flow", "user_register",
                 "email_otp_send", "email_otp_wait", "email_otp_validate",
                 "create_account", "auth_session", "codex_oauth",
-                "access_token_probe", "totp_enroll", "finalize",
+                "access_token_probe", "detect_offer", "detect_payment_methods", "totp_enroll", "finalize",
             }
             unknown_stages = sorted(set(stage_timeouts) - valid_stages)
             if unknown_stages:
@@ -523,6 +537,12 @@ def validate_config(config: Mapping[str, Any], *, workflow: str | None = None) -
         errors.append("email_registration must be an object")
     if isinstance(email, Mapping):
         _validate_positive_numbers(email, ("otp_timeout", "otp_poll_interval"), "email_registration", errors)
+        registration_mode = str(email.get("registration_mode") or "password").strip().lower().replace("-", "_")
+        if registration_mode not in {
+            "password", "password_signup", "user_register", "legacy",
+            "passwordless", "passwordless_signup", "login_or_signup", "har",
+        }:
+            errors.append("email_registration.registration_mode must be password or passwordless")
 
     payments = config.get("protocol_payments", {})
     if payments is not None and not isinstance(payments, Mapping):

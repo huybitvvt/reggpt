@@ -34,7 +34,7 @@ public sealed class PaymentBatchViewModelTests
         Assert.Equal(1, service.LastRequest.Canary);
         Assert.StartsWith("momo_", service.LastRequest.BatchId);
         Assert.NotEqual("probe_id", service.LastRequest.BatchId);
-        Assert.Equal("正在执行 Checkout 与 Stripe init 支付能力探测...", statusDuringRun);
+        Assert.Equal("Đang chạy kiểm tra khả năng thanh toán Checkout và Stripe init...", statusDuringRun);
         Assert.True(viewModel.HasRun);
         Assert.Single(viewModel.Results);
     }
@@ -131,8 +131,8 @@ public sealed class PaymentBatchViewModelTests
         await viewModel.RunCommand.ExecuteAsync(null);
 
         PaymentBatchResultRow row = Assert.Single(viewModel.Results);
-        Assert.Equal("支付链接", row.ResultKind);
-        Assert.Equal("已生成（报告仅保留存在状态）", row.ResultDisplay);
+        Assert.Equal("Link thanh toán", row.ResultKind);
+        Assert.Equal("Đã tạo (báo cáo chỉ giữ trạng thái tồn tại)", row.ResultDisplay);
         Assert.True(row.ResultPresent);
         Assert.False(row.HasCopyableResult);
     }
@@ -191,25 +191,25 @@ public sealed class PaymentBatchViewModelTests
             viewModel.Results,
             link =>
             {
-                Assert.Equal("支付链接", link.ResultKind);
+                Assert.Equal("Link thanh toán", link.ResultKind);
                 Assert.Equal("https://pay.example/short", link.ResultValue);
                 Assert.Equal(link.ResultValue, link.ResultDisplay);
                 Assert.True(link.HasCopyableResult);
             },
             qr =>
             {
-                Assert.Equal("二维码内容", qr.ResultKind);
+                Assert.Equal("Nội dung mã QR", qr.ResultKind);
                 Assert.Equal("000201010212...", qr.ResultValue);
                 Assert.Equal(qr.ResultValue, qr.ResultDisplay);
             },
             qrFile =>
             {
-                Assert.Equal("二维码文件", qrFile.ResultKind);
+                Assert.Equal("File mã QR", qrFile.ResultKind);
                 Assert.Equal("C:\\runtime\\qr-only.png", qrFile.ResultValue);
             },
             failed =>
             {
-                Assert.Equal("checkout_failed", failed.ResultDisplay);
+                Assert.Equal("provider rejected checkout", failed.ResultDisplay);
                 Assert.False(failed.HasCopyableResult);
             });
     }
@@ -223,7 +223,7 @@ public sealed class PaymentBatchViewModelTests
             new[] { new PaymentBatchAccount("user@example.com", true) });
 
         Assert.Equal("momo", viewModel.SelectedMethod.Id);
-        Assert.Equal(new PaymentProxyCountryOption("", "自动（跟随账单区）"), viewModel.CheckoutCountryOptions[0]);
+        Assert.Equal(new PaymentProxyCountryOption("", "Tự động (theo vùng billing)"), viewModel.CheckoutCountryOptions[0]);
         Assert.Equal(
             PaymentMethods.CheckoutCountryOptions("momo"),
             viewModel.CheckoutCountryOptions.Skip(1).ToArray());
@@ -304,7 +304,7 @@ public sealed class PaymentBatchViewModelTests
             ManualAccessTokens = "at-one\nat-two"
         };
 
-        Assert.Equal("手动 AT 2 / 10", viewModel.AccountSummary);
+        Assert.Equal("AT thủ công 2 / 10", viewModel.AccountSummary);
         viewModel.RunCommand.NotifyCanExecuteChanged();
         Assert.True(viewModel.RunCommand.CanExecute(null));
 
@@ -326,7 +326,7 @@ public sealed class PaymentBatchViewModelTests
         PaymentBatchResultRow row = Assert.Single(viewModel.Results);
         Assert.Equal("User@example.com", row.AccountRef);
         Assert.Equal("100%", row.ProgressText);
-        Assert.Equal("成功", row.ResultStatus);
+        Assert.Equal("Thành công", row.ResultStatus);
     }
 
     [Fact]
@@ -346,8 +346,8 @@ public sealed class PaymentBatchViewModelTests
 
         PaymentBatchResultRow row = Assert.Single(viewModel.Results);
         Assert.Equal("100%", row.ProgressText);
-        Assert.Equal("成功", row.ResultStatus);
-        Assert.Equal("完成", row.CurrentStage);
+        Assert.Equal("Thành công", row.ResultStatus);
+        Assert.Equal("Hoàn tất", row.CurrentStage);
         }
         finally
         {

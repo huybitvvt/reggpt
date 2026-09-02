@@ -134,7 +134,7 @@ public sealed class DesktopWindowSmokeTests
         SettingsWindow settings,
         SettingsViewModel viewModel)
     {
-        SettingsCategoryViewModel networkCategory = viewModel.Categories.Single(category => category.Title == "网络与支付");
+        SettingsCategoryViewModel networkCategory = viewModel.Categories.Single(category => category.Title == "Mạng và thanh toán");
         string proxyLines = string.Join(
             Environment.NewLine,
             Enumerable.Range(1, 12).Select(index => $"http://proxy-{index:D2}-{new string('x', 90)}.example:8080"));
@@ -194,7 +194,7 @@ public sealed class DesktopWindowSmokeTests
             Assert.True(contentBounds.Right <= verticalBounds.Left + 0.5);
         }
 
-        SettingsCategoryViewModel registrationCategory = viewModel.Categories.Single(category => category.Title == "注册与接码");
+        SettingsCategoryViewModel registrationCategory = viewModel.Categories.Single(category => category.Title == "Đăng ký và nhận mã");
         viewModel.SelectedCategory = registrationCategory;
         settings.UpdateLayout();
         var driverEditor = FindVisualChildren<ComboBox>(settings)
@@ -273,15 +273,20 @@ public sealed class DesktopWindowSmokeTests
             Assert.DoesNotContain("注册批次", headers);
             Assert.DoesNotContain("入库", headers);
             DataGridColumn[] equalWidthColumns = accountGrid.Columns
-                .Where(column => new[] { "状态", "AT", "RT", "2FA" }.Contains(column.Header?.ToString() ?? ""))
+                .Where(column => new[] { "Trạng thái", "AT", "RT", "2FA" }.Contains(column.Header?.ToString() ?? ""))
                 .ToArray();
             Assert.Equal(4, equalWidthColumns.Length);
             Assert.Single(equalWidthColumns.Select(column => column.Width.Value).Distinct());
             DataGridColumn promotionColumn = Assert.Single(
                 accountGrid.Columns,
-                column => (column.Header?.ToString() ?? "") == "优惠状态");
+                column => (column.Header?.ToString() ?? "") == "Phương thức thanh toán & Ưu đãi");
             Assert.True(promotionColumn.CanUserSort);
             Assert.Equal("PromotionStatus", promotionColumn.SortMemberPath);
+            var toolbarDelete = Assert.IsType<Button>(main.FindName("ToolbarDeleteSelectedButton"));
+            Assert.Equal("Xóa mục đã chọn", toolbarDelete.ToolTip?.ToString());
+            Assert.True(toolbarDelete.ActualWidth >= 72);
+            var toolbarClear = Assert.IsType<Button>(main.FindName("ToolbarClearSelectionButton"));
+            Assert.Equal("Bỏ chọn tất cả", toolbarClear.ToolTip?.ToString());
 
             var contextMenu = Assert.IsType<ContextMenu>(accountGrid.ContextMenu);
             contextMenu.PlacementTarget = accountGrid;
@@ -312,6 +317,7 @@ public sealed class DesktopWindowSmokeTests
             string[] sourceOptions = Array.Empty<string>();
             string[] fieldLabels = Array.Empty<string>();
             string[] checkBoxLabels = Array.Empty<string>();
+            bool? disable2faChecked = null;
             int comboBoxCount = 0;
             var method = typeof(MainWindow).GetMethod(
                 "CreateRegisterOptionsDialog",
@@ -341,14 +347,20 @@ public sealed class DesktopWindowSmokeTests
                         .Select(checkBox => checkBox.Content?.ToString() ?? "")
                         .Where(text => !string.IsNullOrWhiteSpace(text))
                         .ToArray();
+                    disable2faChecked = FindVisualChildren<CheckBox>(dialog)
+                        .First(checkBox => string.Equals(
+                            checkBox.Content?.ToString(),
+                            "Tắt 2FA (không đăng ký TOTP)",
+                            StringComparison.Ordinal))
+                        .IsChecked;
                 });
             Assert.Equal(new[]
             {
-                "ReMail 邮箱",
-                "Smailr 邮箱",
-                "Outlook/Hotmail/iCloud 邮箱池",
-                "CF Worker 域名邮箱",
-                "手机号注册"
+                "ReMail Email",
+                "Smailr Email",
+                "Pool email Outlook/Hotmail/iCloud",
+                "Email tên miền CF Worker",
+                "Đăng ký bằng số điện thoại"
             }, sourceOptions);
             Assert.DoesNotContain(sourceOptions, option => option.Contains("📱", StringComparison.Ordinal));
             Assert.DoesNotContain("liziai.cloud (CFWorker)", sourceOptions);
@@ -357,13 +369,15 @@ public sealed class DesktopWindowSmokeTests
             Assert.DoesNotContain("注册批次 ID", fieldLabels);
             Assert.DoesNotContain("生链方式", fieldLabels);
             Assert.DoesNotContain("只注册，不生成支付链接", checkBoxLabels);
-            Assert.Contains("关闭 2FA（不注册 TOTP）", checkBoxLabels);
-            Assert.Contains("注册完成后查询试用优惠", checkBoxLabels);
+            Assert.Contains("Tắt 2FA (không đăng ký TOTP)", checkBoxLabels);
+            Assert.Contains("Phát hiện ưu đãi và phương thức thanh toán sau đăng ký", checkBoxLabels);
+            Assert.False(disable2faChecked);
             Assert.Equal(1, comboBoxCount);
 
             stage("show selected registration dialog");
             int selectedComboBoxCount = -1;
             int selectedCheckBoxCount = -1;
+            bool? selectedDisable2faChecked = null;
             method = typeof(MainWindow).GetMethod(
                 "CreateSelectedRegisterOptionsDialog",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
@@ -376,10 +390,18 @@ public sealed class DesktopWindowSmokeTests
                 dialog =>
                 {
                     selectedComboBoxCount = FindVisualChildren<ComboBox>(dialog).Count();
-                    selectedCheckBoxCount = FindVisualChildren<CheckBox>(dialog).Count();
+                    CheckBox[] checkBoxes = FindVisualChildren<CheckBox>(dialog).ToArray();
+                    selectedCheckBoxCount = checkBoxes.Length;
+                    selectedDisable2faChecked = checkBoxes
+                        .First(checkBox => string.Equals(
+                            checkBox.Content?.ToString(),
+                            "Tắt 2FA (không đăng ký TOTP)",
+                            StringComparison.Ordinal))
+                        .IsChecked;
                 });
             Assert.Equal(0, selectedComboBoxCount);
             Assert.Equal(2, selectedCheckBoxCount);
+            Assert.False(selectedDisable2faChecked);
             stage("verify mailbox selection routing");
             VerifyMailboxSelectionFileRouting(main);
         }
@@ -445,12 +467,12 @@ public sealed class DesktopWindowSmokeTests
         };
 
         string formatted = Assert.IsType<string>(formatter.Invoke(main, new object[] { results, summary }));
-        Assert.Contains("总数：5", formatted);
-        Assert.Contains("AT有效：1", formatted);
-        Assert.Contains("AT失效：1", formatted);
-        Assert.Contains("账号停用：2", formatted);
-        Assert.Contains("其他失败：1", formatted);
-        Assert.Contains("确认停用：1", formatted);
+        Assert.Contains("Tổng: 5", formatted);
+        Assert.Contains("AT hợp lệ: 1", formatted);
+        Assert.Contains("AT hết hiệu lực: 1", formatted);
+        Assert.Contains("Tài khoản bị dừng: 2", formatted);
+        Assert.Contains("Lỗi khác: 1", formatted);
+        Assert.Contains("Xác nhận bị dừng: 1", formatted);
     }
 
     private static void VerifyMailboxSelectionFileRouting(MainWindow main)
@@ -559,7 +581,7 @@ public sealed class DesktopWindowSmokeTests
             Assert.Contains(
                 paymentViewModel.PaymentMethodOptions,
                 option => option.Id == "direct_card");
-            Assert.IsType<DataGrid>(payment.FindName("ResultsGrid"));
+            Assert.IsType<ListBox>(payment.FindName("ResultsGrid"));
             payment.Close();
             stage("verify main window dialogs");
             VerifyMainWindowRegistrationAndContextMenu(fixture.Path, stage);

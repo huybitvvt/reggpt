@@ -131,6 +131,7 @@ class RegistrationRuntimeState:
     reg_response: Any = None
     reg_data: dict[str, Any] = field(default_factory=dict)
     resume_email_verification: bool = False
+    otp_pre_sent: bool = False
     otp_issued_after: int = 0
     email_cfg: dict[str, Any] = field(default_factory=dict)
     email_code: str = field(default="", repr=False)
@@ -153,6 +154,10 @@ class RegistrationRuntimeState:
     post_registration_ready: bool = False
     totp_secret: str = field(default="", repr=False)
     twofa_result: dict[str, Any] = field(default_factory=dict, repr=False)
+    promotion_result: dict[str, Any] = field(default_factory=dict)
+    promotion_status: str = ""
+    payment_capability: dict[str, Any] = field(default_factory=dict)
+    payment_badges: list[str] = field(default_factory=list)
 
 
 class RegistrationEmailWorkflow:
@@ -216,6 +221,11 @@ class RegistrationEmailWorkflow:
             self._run_stage(RegistrationState.AUTH_SESSION, "8-Fetch auth session", self.fetch_auth_session)
             self._run_stage(RegistrationState.ACCESS_TOKEN_PROBE, "8d-Validate access token", self.probe_access_token)
             self._set_outcome()
+            self._run_stage(
+                RegistrationState.DETECT_PAYMENT_METHODS,
+                "8e-Get Session offer/payment check",
+                self.detect_payment_methods,
+            )
             self._run_stage(RegistrationState.TOTP_ENROLL, "9-Enroll TOTP", self.enroll_totp)
             return self._run_stage(RegistrationState.FINALIZE, "10-Finalize registration", self.finalize)
         except RegistrationAbort as exc:
@@ -368,6 +378,11 @@ class RegistrationEmailWorkflow:
         print(f"[*] Resuming saved registration checkpoint for {mailbox_email}")
         self._run_stage(RegistrationState.ACCESS_TOKEN_PROBE, "8d-Resume AT probe", self.probe_access_token)
         self._set_outcome()
+        self._run_stage(
+            RegistrationState.DETECT_PAYMENT_METHODS,
+            "8e-Get Session offer/payment check",
+            self.detect_payment_methods,
+        )
         return self._run_stage(RegistrationState.FINALIZE, "10-Finalize resumed registration", self.finalize)
 
     def _has_resume_checkpoint(self) -> bool:
@@ -629,18 +644,28 @@ class RegistrationEmailWorkflow:
     def user_register(self) -> None:
         r = self.r
         s = self.runtime
-        password_fallback = bool(s.signup_state.get("password_fallback")) or r._is_signup_password_step(s.signup_state.get("url", ""))
-        if s.registration_mode == "passwordless" and not password_fallback:
+        state_url = str(s.signup_state.get("url") or "")
+        password_fallback = bool(s.signup_state.get("password_fallback")) or r._is_signup_password_step(state_url)
+        email_verification_ready = r._is_email_verification_step(state_url)
+        if not password_fallback and (s.registration_mode == "passwordless" or email_verification_ready):
             s.reg_data = {
-                "mode": "passwordless_signup",
+                "mode": "passwordless_signup" if s.registration_mode == "passwordless" else "email_verification_signup",
                 "auth_state": {
                     "attempt": s.signup_state.get("attempt", ""),
-                    "url": s.signup_state.get("url", ""),
+                    "url": state_url,
                     "status": s.signup_state.get("status", 0),
                 },
             }
             s.password_unknown = True
-            print("  Registration mode: passwordless_signup (HAR login_or_signup)")
+            if email_verification_ready:
+                s.resume_email_verification = True
+                s.otp_pre_sent = True
+                print(
+                    "  Auth flow already reached email-verification; "
+                    "skipping the legacy user/register request."
+                )
+            else:
+                print("  Registration mode: passwordless_signup (HAR login_or_signup)")
             return
         username_sentinel = self._issue_sentinel("username_password_create")
         s.reg_response = r.request_with_retry(
@@ -664,9 +689,12 @@ class RegistrationEmailWorkflow:
         if s.reg_response.status_code != 200:
             err_code = s.reg_data.get("error", {}).get("code", "")
             err_msg = s.reg_data.get("error", {}).get("message", str(s.reg_data))
-            state_url = str(s.signup_state.get("url") or "")
-            if err_code == "invalid_auth_step" and "email-verification" in state_url:
-                print("  Account already in email-verification flow, resuming OTP step...")
+            in_email_verification = r._is_email_verification_step(state_url)
+            if in_email_verification and err_code == "invalid_auth_step":
+                print(
+                    "  Registration session is already in email-verification flow; "
+                    "continuing with the OTP step..."
+                )
                 s.resume_email_verification = True
             else:
                 self._abort(f"user_register:{err_msg}")
@@ -682,7 +710,7 @@ class RegistrationEmailWorkflow:
         )
         otp_send_started = int(time.time())
         password_fallback = bool(s.signup_state.get("password_fallback")) or r._is_signup_password_step(s.signup_state.get("url", ""))
-        if s.registration_mode == "passwordless" and not password_fallback:
+        if s.otp_pre_sent or (s.registration_mode == "passwordless" and not password_fallback):
             # authorize with login_hint sends the first OTP itself. Do not
             # immediately POST resend: that endpoint is rate-limited for this
             # flow and the reference browser path only polls the pre-sent code.
@@ -705,7 +733,7 @@ class RegistrationEmailWorkflow:
         if getattr(response, "status_code", 0) not in (200, 202, 204):
             self._abort(f"email_otp_send_failed:{response.status_code}")
         s.otp_issued_after = otp_send_started
-        if s.registration_mode == "passwordless" and r._json_or_raw(response).get("assumed_pre_sent"):
+        if r._json_or_raw(response).get("assumed_pre_sent"):
             s.otp_issued_after = max(0, s.auth_flow_started - 5)
 
     def wait_email_otp(self) -> None:
@@ -951,6 +979,186 @@ class RegistrationEmailWorkflow:
             and (not require_phone or bool(s.phone_result.get("ok")))
         )
 
+    def _registration_country(self) -> str:
+        registration_cfg = self.config.get("registration", {}) if isinstance(self.config, Mapping) else {}
+        registration_cfg = registration_cfg if isinstance(registration_cfg, Mapping) else {}
+        configured = str(registration_cfg.get("payment_country") or "").strip().upper()
+        if configured:
+            return configured
+        from .paypal_proxy import infer_proxy_country
+
+        return str(infer_proxy_country(self.runtime.proxy) or "").strip().upper()
+
+    def detect_offer(self) -> None:
+        """Read the real account offer on the live registration session."""
+        r = self.r
+        s = self.runtime
+        registration_cfg = self.config.get("registration", {}) if isinstance(self.config, Mapping) else {}
+        registration_cfg = registration_cfg if isinstance(registration_cfg, Mapping) else {}
+        if not bool(registration_cfg.get("detect_offer", True)):
+            s.promotion_result = {
+                "ok": False,
+                "status": "skipped",
+                "error": "offer detection is disabled",
+            }
+            print("  [Offer] Detection disabled in Settings")
+            return
+        if not (s.success and s.access_token):
+            return
+        if s.session is None:
+            s.promotion_result = {
+                "ok": False,
+                "status": "skipped",
+                "error": "registration_session_unavailable",
+            }
+            s.promotion_status = "Kiểm tra thất bại"
+            print("  [Offer] Detection skipped: live registration session is unavailable")
+            return
+
+        from .account_promotion import check_account_promotion
+
+        try:
+            result = check_account_promotion(
+                {
+                    "email": s.username,
+                    "access_token": s.access_token,
+                    "id_token": s.id_token,
+                    "device_id": s.device_id,
+                    "auth_session": s.auth_body,
+                    "registration_country": self._registration_country(),
+                },
+                proxy=s.proxy,
+                timeout=max(5, int(registration_cfg.get("offer_check_timeout_seconds", 20) or 20)),
+                request_session=s.session,
+            )
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "error": r._sanitize_text(exc),
+                "promotion_status": "Kiểm tra thất bại",
+            }
+        s.promotion_result = result
+        s.promotion_status = str(result.get("promotion_status") or "").strip()
+        if result.get("ok"):
+            print(f"  [Offer] {s.promotion_status or 'Checked'}")
+        else:
+            detail = r._sanitize_text(result.get("error") or "offer_detection_failed")
+            print(f"  [Offer] Detection failed: {detail}")
+
+    def detect_payment_methods(self) -> None:
+        """Run the Get Session offer/payment checker on the registration session."""
+        r = self.r
+        s = self.runtime
+        registration_cfg = self.config.get("registration", {}) if isinstance(self.config, Mapping) else {}
+        registration_cfg = registration_cfg if isinstance(registration_cfg, Mapping) else {}
+        if not bool(registration_cfg.get("detect_payment_methods", True)):
+            s.payment_capability = {
+                "ok": False,
+                "status": "skipped",
+                "error": "payment-method detection is disabled",
+                "error_code": "payment_detection_disabled",
+                "error_stage": "payment_detection_context",
+                "payment_method_badges": [],
+                "payment_method_types": [],
+                "custom_payment_methods": [],
+            }
+            print("  [Payment] Detection disabled in Settings")
+            return
+        if not (s.success and s.access_token):
+            return
+        if s.session is None:
+            s.payment_capability = {
+                "ok": False,
+                "status": "skipped",
+                "error": "live registration session is unavailable",
+                "error_code": "registration_session_unavailable",
+                "error_stage": "payment_detection_context",
+                "payment_method_badges": [],
+                "payment_method_types": [],
+                "custom_payment_methods": [],
+            }
+            print("  [Payment] Detection skipped: live registration session is unavailable")
+            return
+
+        from .payment_capability import detect_account_payment_methods
+        country = self._registration_country()
+        promo_campaign_id = str(
+            registration_cfg.get("payment_promo_campaign_id") or "plus-1-month-free"
+        ).strip()
+        if s.promotion_result.get("ok") and s.promotion_result.get("plus_trial_eligible"):
+            promo_campaign_id = str(
+                s.promotion_result.get("plus_trial_campaign_id") or promo_campaign_id
+            ).strip()
+        sentinel_token = ""
+        try:
+            sentinel_token = str(self._issue_sentinel("chatgpt_checkout").token or "").strip()
+        except Exception as exc:
+            print(
+                "  [Get Session] checkout Sentinel unavailable; continuing without it: "
+                f"{r._sanitize_text(exc)}"
+            )
+        try:
+            capability = detect_account_payment_methods(
+                s.access_token,
+                auth_context={
+                    "cookie_header": s.auth_session.get("cookie_header", ""),
+                    "headers": dict(s.base_headers),
+                    "impersonate": r.auth_impersonate(),
+                    "oai_did": s.device_id,
+                    "registration_country": country,
+                    "sentinel_token": sentinel_token,
+                },
+                proxy=s.proxy,
+                billing_country=country,
+                promo_campaign_id=promo_campaign_id,
+                registration_session=s.session,
+            )
+        except Exception as exc:
+            capability = {
+                "ok": False,
+                "status": "failed",
+                "error": r._sanitize_text(exc),
+                "error_code": "payment_method_detection_failed",
+                "error_stage": "payment_method_detection",
+                "payment_method_badges": [],
+                "payment_method_types": [],
+                "custom_payment_methods": [],
+            }
+        s.payment_capability = capability
+        s.payment_badges = list(capability.get("payment_method_badges") or capability.get("badges") or [])
+        if capability.get("ok"):
+            zero_due = capability.get("amount_due") == 0
+            if zero_due:
+                s.promotion_status = "Có thể dùng thử Plus · 0 đ"
+            elif capability.get("amount_due") is not None:
+                s.promotion_status = "Không có ưu đãi 0 đ"
+            else:
+                s.promotion_status = "Đã đọc phương thức; giá chưa xác định"
+            s.promotion_result = {
+                "ok": True,
+                "source": "get_session_payment_check",
+                "promotion_status": s.promotion_status,
+                "plus_trial_eligible": zero_due,
+                "plus_trial_campaign_id": promo_campaign_id if zero_due else "",
+                "amount_due": capability.get("amount_due"),
+                "currency": capability.get("currency", ""),
+                "payment_capability": capability,
+            }
+            print(f"  [Get Session] Detected: {', '.join(s.payment_badges) or 'none'}")
+        else:
+            code = str(capability.get("error_code") or "payment_method_detection_failed")
+            detail = r._sanitize_text(capability.get("error") or code)
+            s.promotion_status = "Kiểm tra thất bại"
+            s.promotion_result = {
+                "ok": False,
+                "source": "get_session_payment_check",
+                "promotion_status": s.promotion_status,
+                "error": detail,
+                "error_code": code,
+                "payment_capability": capability,
+            }
+            print(f"  [Get Session] Detection failed: {code}: {detail}")
+
     def enroll_totp(self) -> None:
         r = self.r
         s = self.runtime
@@ -1024,7 +1232,6 @@ class RegistrationEmailWorkflow:
         s = self.runtime
         from .auth_headers import current_auth_fingerprint
         from .token_telemetry import access_token_telemetry
-        from .paypal_proxy import infer_proxy_country
         from .sentinel.bundle import sentinel_version
 
         fingerprint = current_auth_fingerprint()
@@ -1048,11 +1255,28 @@ class RegistrationEmailWorkflow:
             "source": "register",
             "register_method": "email" if s.registration_mode != "phone" else "phone",
             "session_type": "at_only" if s.registration_mode == "at_only" else "web",
-            "plan_type": "unknown",
+            "plan_type": str(s.promotion_result.get("current_plan_type") or "unknown"),
             "phone": s.phone_result.get("phone", "") if s.phone_result.get("ok") else "",
             "password": "" if s.password_unknown else s.password,
             "name": s.full_name,
             "birthdate": s.birthdate,
+            "promotion_status": s.promotion_status,
+            "promotion_result": s.promotion_result,
+            "promotion": {
+                "status": s.promotion_status,
+                "updated_at": int(time.time()),
+                "last_result": s.promotion_result,
+            } if s.promotion_result else {},
+            "payment_capability": s.payment_capability,
+            "payment_method_badges": s.payment_badges,
+            "payment_method_types": s.payment_capability.get("payment_method_types", []),
+            "custom_payment_methods": s.payment_capability.get("custom_payment_methods", []),
+            "amount_due": s.payment_capability.get("amount_due", s.payment_capability.get("amount_minor")),
+            "currency": s.payment_capability.get("currency", ""),
+            "offer_state": s.payment_capability.get("offer_state", ""),
+            "payment_check_status": s.payment_capability.get("status", ""),
+            "payment_check_error": s.payment_capability.get("error", ""),
+            "payment_checked_at": s.payment_capability.get("checked_at", 0),
             "response": {
                 "register": s.reg_data,
                 "email_otp": s.otp_data,
@@ -1061,6 +1285,8 @@ class RegistrationEmailWorkflow:
                 "phone_verification": s.phone_result,
                 "codex_oauth": r._oauth_result_summary(s.oauth_result),
                 "access_token_probe": s.at_probe,
+                "promotion": s.promotion_result,
+                "payment_capability": s.payment_capability,
             },
             "auth_session": s.auth_body,
             "access_token": s.access_token or "",
@@ -1082,7 +1308,7 @@ class RegistrationEmailWorkflow:
             "access_token_telemetry": token_telemetry,
             "auth_fingerprint_profile": str(fingerprint.get("impersonate") or ""),
             "sentinel_version": sentinel_version(),
-            "registration_country": infer_proxy_country(s.proxy),
+            "registration_country": self._registration_country(),
             "registration_warning": r._sanitize_text(s.registration_warning),
             "post_registration_ready": s.post_registration_ready,
             "cookie_header": s.auth_session.get("cookie_header", ""),

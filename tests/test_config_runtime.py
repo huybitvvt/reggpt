@@ -62,6 +62,36 @@ def test_registration_schema_rejects_unknown_stage_timeout(tmp_path):
         load_runtime_config(path)
 
 
+def test_registration_schema_accepts_offer_detection_stage_and_rejects_bad_toggle(tmp_path):
+    value = _base_config()
+    value["registration"].update({
+        "detect_offer": True,
+        "offer_check_timeout_seconds": 20,
+        "stage_timeouts": {"detect_offer": 25},
+    })
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    assert load_runtime_config(path).data["registration"]["detect_offer"] is True
+
+    value["registration"]["detect_offer"] = "yes"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(ConfigError, match="registration.detect_offer must be a boolean"):
+        load_runtime_config(path)
+
+
+def test_registration_auth_mode_accepts_password_and_rejects_unknown_value(tmp_path):
+    value = _base_config()
+    value["email_registration"] = {"registration_mode": "password"}
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    assert load_runtime_config(path).data["email_registration"]["registration_mode"] == "password"
+
+    value["email_registration"]["registration_mode"] = "google"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(ConfigError, match="registration_mode must be password or passwordless"):
+        load_runtime_config(path)
+
+
 def test_payment_matrix_validates_method_country_and_sample_size(tmp_path):
     value = _base_config()
     value["protocol_payments"]["matrix"]["cells"] = [{

@@ -23,6 +23,7 @@ FLOW_PAGE_URLS = {
     "authorize_continue": "https://auth.openai.com/email-verification",
     "oauth_create_account": "https://auth.openai.com/about-you",
     "checkout_session_approval": "https://chatgpt.com/",
+    "chatgpt_checkout": "https://chatgpt.com/",
 }
 
 

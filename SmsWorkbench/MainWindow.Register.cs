@@ -452,7 +452,7 @@
             var no2faBox = new CheckBox
             {
                 Content = "Tắt 2FA (không đăng ký TOTP)",
-                IsChecked = true,
+                IsChecked = false,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
             };
@@ -462,7 +462,7 @@
 
             var promotionBox = new CheckBox
             {
-                Content = "Tra ưu đãi dùng thử sau khi đăng ký xong",
+                Content = "Phát hiện ưu đãi và phương thức thanh toán sau đăng ký",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
@@ -566,7 +566,7 @@
             var no2faBox = new CheckBox
             {
                 Content = "Tắt 2FA (không đăng ký TOTP)",
-                IsChecked = true,
+                IsChecked = false,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")
             };
@@ -576,7 +576,7 @@
 
             var promotionBox = new CheckBox
             {
-                Content = "Tra ưu đãi dùng thử sau khi đăng ký xong",
+                Content = "Phát hiện ưu đãi và phương thức thanh toán sau đăng ký",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 0, 10),
                 Foreground = (System.Windows.Media.Brush)FindResource("TextMain")

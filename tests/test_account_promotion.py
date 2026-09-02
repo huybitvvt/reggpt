@@ -1,7 +1,7 @@
 """Tests for accounts/check plan + promotion (优惠) parsing and labels."""
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from sms_tool import cli
 from sms_tool import account_promotion
@@ -32,7 +32,7 @@ def test_parse_plus_trial_eligible():
     assert result["ok"] and result["plus_trial_eligible"]
     assert result["current_plan_type"] == "free"
     label = promotion_status_label(result)
-    assert "可试用Plus" in label and "70%" in label
+    assert "Có thể dùng thử Plus" in label and "70%" in label
 
 
 def test_parse_paid_subscription():
@@ -52,12 +52,80 @@ def test_parse_paid_subscription():
 def test_parse_free_without_promo():
     body = {"accounts": {"default": {"account": {"plan_type": "free"}, "entitlement": {"has_active_subscription": False}}}}
     result = parse_accounts_check(body)
-    assert promotion_status_label(result) == "Free·无优惠"
+    assert promotion_status_label(result) == "Free·không có ưu đãi"
 
 
 def test_labels_for_failures():
-    assert promotion_status_label({"ok": False, "error": "token_invalid"}) == "AT失效"
-    assert promotion_status_label({"ok": False, "error": "boom"}) == "检测失败"
+    assert promotion_status_label({"ok": False, "error": "token_invalid"}) == "AT hết hiệu lực"
+    assert promotion_status_label({"ok": False, "error": "boom"}) == "Kiểm tra thất bại"
+
+
+def test_promotion_check_does_not_repeat_payment_detection():
+    def browser_fetch(url, *, headers=None, timeout_ms=None):
+        return {
+            "status": 200,
+            "body": {
+                "accounts": {
+                    "default": {
+                        "account": {"plan_type": "free"},
+                        "entitlement": {"has_active_subscription": False},
+                    }
+                }
+            },
+        }
+
+    with patch(
+        "sms_tool.payment_capability.detect_account_payment_methods",
+        side_effect=AssertionError("promotion must not repeat payment detection"),
+    ) as detect:
+        result = account_promotion.check_account_promotion(
+            {"access_token": "at", "registration_country": "VN"},
+            browser_fetch=browser_fetch,
+        )
+
+    assert result["ok"] is True
+    assert "payment_capability" not in result
+    detect.assert_not_called()
+
+
+def test_inline_promotion_check_reuses_live_registration_session():
+    response = SimpleNamespace(
+        status_code=200,
+        json=lambda: {
+            "accounts": {
+                "default": {
+                    "account": {"plan_type": "free"},
+                    "entitlement": {
+                        "subscription_plan": "chatgptfreeplan",
+                        "has_active_subscription": False,
+                    },
+                    "eligible_promo_campaigns": {
+                        "plus": {"id": "real-campaign", "metadata": {}}
+                    },
+                }
+            }
+        },
+    )
+    live_session = SimpleNamespace(get=Mock(return_value=response))
+
+    with patch.object(account_promotion, "select_operation_proxy") as select_proxy, patch.object(
+        account_promotion.curl_requests,
+        "get",
+        side_effect=AssertionError("must use live registration session"),
+    ):
+        result = account_promotion.check_account_promotion(
+            {"access_token": "at", "device_id": "device-123"},
+            proxy="http://signup.example:8080",
+            request_session=live_session,
+        )
+
+    assert result["ok"] is True
+    assert result["plus_trial_campaign_id"] == "real-campaign"
+    select_proxy.assert_not_called()
+    request = live_session.get.call_args
+    assert request.args[0].startswith(account_promotion.ACCOUNTS_CHECK_URL)
+    assert request.kwargs["headers"]["Authorization"] == "Bearer at"
+    assert "proxies" not in request.kwargs
 
 
 def test_promotion_uses_dedicated_health_proxy_with_account_fingerprint_and_device():
@@ -112,7 +180,7 @@ def test_refresh_promotion_statuses_emits_terminal_event_per_account(monkeypatch
     monkeypatch.setattr("sms_tool.desktop_ipc.emit_event", lambda payload, enabled=None: events.append(payload) or True)
     monkeypatch.setattr("sms_tool.storage.get_account_record", lambda email: {"email": email, "access_token": "at"})
     monkeypatch.setattr("sms_tool.storage.mark_promotion_status", lambda *args, **kwargs: True)
-    monkeypatch.setattr(account_promotion, "check_account_promotion", lambda account, **kwargs: {"ok": True, "promotion_status": "Free·无优惠"})
+    monkeypatch.setattr(account_promotion, "check_account_promotion", lambda account, **kwargs: {"ok": True, "promotion_status": "Free·không có ưu đãi"})
 
     result = account_promotion.refresh_promotion_statuses(["a@example.com", "b@example.com"], workers=2)
 
@@ -134,8 +202,8 @@ def test_post_registration_promotion_stage_deduplicates_and_counts_trials():
         "success": 2,
         "failed": 0,
         "results": [
-            {"email": "one@example.com", "promotion_status": "可试用Plus", "probe": {"plus_trial_eligible": True}},
-            {"email": "two@example.com", "promotion_status": "Free·无优惠", "probe": {"plus_trial_eligible": False}},
+            {"email": "one@example.com", "promotion_status": "Có thể dùng thử Plus", "probe": {"plus_trial_eligible": True}},
+            {"email": "two@example.com", "promotion_status": "Free·không có ưu đãi", "probe": {"plus_trial_eligible": False}},
         ],
     }
     with patch("sms_tool.account_promotion.refresh_promotion_statuses", return_value=result) as refresh:
@@ -190,6 +258,50 @@ def test_registration_save_invokes_optional_promotion_stage(tmp_path):
     assert report["promotion"] == promotion
 
 
+def test_registration_save_reuses_successful_inline_offer_without_second_probe(tmp_path):
+    args = SimpleNamespace(
+        registration_batch_id="batch-inline",
+        buy_remail_mailbox=False,
+        remail_service_mode=None,
+        check_promotion_after_registration=True,
+        import_cpa=False,
+        workers=4,
+        proxy=None,
+        refresh_timeout=20,
+    )
+    registration = {
+        "success": True,
+        "email": "inline@example.com",
+        "access_token": "test-access-token",
+        "promotion_status": "Có thể dùng thử Plus·-100%·x1 tháng",
+        "promotion_result": {
+            "ok": True,
+            "promotion_status": "Có thể dùng thử Plus·-100%·x1 tháng",
+            "plus_trial_eligible": True,
+            "plus_trial_campaign_id": "real-campaign",
+        },
+    }
+
+    with patch.object(cli, "CFG", {"output": {"filename_pattern": "session_{email}_{timestamp}.json"}}), \
+         patch.object(cli, "upsert_account", return_value=True), \
+         patch.object(cli, "database_path", return_value=tmp_path / "accounts.sqlite3"), \
+         patch("sms_tool.storage.record_registration_audit"), \
+         patch.object(cli, "_check_registered_promotions") as check:
+        report = cli._save_registration_results(
+            args,
+            [registration],
+            effective_count=1,
+            base_dir=tmp_path,
+            pipeline_started=0,
+            mailbox_seconds=0,
+            register_seconds=1,
+        )
+
+    check.assert_not_called()
+    assert report["promotion"]["total"] == 1
+    assert report["promotion"]["trial_eligible"] == 1
+
+
 def test_promotion_uses_browser_fetch_when_browser_identity_present():
     """Browser-registered accounts route promotion through the browser context."""
     registration_proxy = "http://proxy.example:8080"
@@ -232,7 +344,7 @@ def test_promotion_uses_browser_fetch_when_browser_identity_present():
         )
 
     assert result["ok"]
-    assert result["promotion_status"] == "Free·无优惠"
+    assert result["promotion_status"] == "Free·không có ưu đãi"
     # curl_cffi must NOT be called when browser_fetch is provided
     curl_get.assert_not_called()
 
@@ -286,11 +398,11 @@ def test_promotion_normalizes_browser_fetch_status_key():
 
     assert result["ok"], result
     assert result["status_code"] == 200
-    assert result["promotion_status"] == "Free·无优惠"
+    assert result["promotion_status"] == "Free·không có ưu đãi"
 
 
 def test_promotion_surfaces_real_browser_http_errors_not_zero():
-    """A genuine 401 from the browser must surface as AT失效, not HTTP 0."""
+    """A genuine 401 from the browser must surface as AT hết hiệu lực, not HTTP 0."""
     account, config = _browser_identity_account()
 
     def fake_browser_fetch(url, *, headers=None, timeout_ms=None):
@@ -302,4 +414,4 @@ def test_promotion_surfaces_real_browser_http_errors_not_zero():
         )
 
     assert result["status_code"] == 401
-    assert result["promotion_status"] == "AT失效"
+    assert result["promotion_status"] == "AT hết hiệu lực"

@@ -51,7 +51,8 @@ namespace SmsWorkbench
         {
             "started", "mailbox_ready", "sentinel", "identity_ready", "auth_flow",
             "user_register", "email_otp_send", "email_otp_wait", "email_otp_validate",
-            "create_account", "auth_session", "access_token_probe", "totp_enroll", "finalize", "completed"
+            "create_account", "auth_session", "access_token_probe", "detect_offer",
+            "detect_payment_methods", "totp_enroll", "finalize", "completed"
         };
 
         private static readonly string[] PaymentStages =

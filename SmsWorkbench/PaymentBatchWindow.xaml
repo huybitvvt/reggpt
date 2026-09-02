@@ -9,6 +9,92 @@
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppBg}">
+  <Window.Resources>
+    <SolidColorBrush x:Key="PaymentListBg" Color="#10151D"/>
+    <SolidColorBrush x:Key="PaymentListRowBg" Color="#151A23"/>
+    <SolidColorBrush x:Key="PaymentListRowHover" Color="#1B2230"/>
+    <SolidColorBrush x:Key="PaymentListLine" Color="#263142"/>
+    <SolidColorBrush x:Key="PaymentListText" Color="#F3F7FF"/>
+    <SolidColorBrush x:Key="PaymentListMuted" Color="#8B97AA"/>
+
+    <Style x:Key="PaymentResultItemContainer" TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <ContentPresenter/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="PaymentStatusBadge" TargetType="Border">
+      <Setter Property="Width" Value="74"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Background" Value="#112B24"/>
+      <Setter Property="BorderBrush" Value="#00A674"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding ResultStatus}" Value="Đang chạy">
+          <Setter Property="Background" Value="#10243A"/>
+          <Setter Property="BorderBrush" Value="#2F80ED"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding ResultStatus}" Value="Thất bại">
+          <Setter Property="Background" Value="#35171A"/>
+          <Setter Property="BorderBrush" Value="#F05252"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding ResultStatus}" Value="Đang chờ">
+          <Setter Property="Background" Value="#202633"/>
+          <Setter Property="BorderBrush" Value="#64748B"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PaymentMethodBadge" TargetType="Border">
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="MinWidth" Value="48"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="Margin" Value="0,0,8,0"/>
+      <Setter Property="Background" Value="#334155"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding}" Value="Trial: 0 đ">
+          <Setter Property="Background" Value="#168A3A"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding}" Value="Card">
+          <Setter Property="Background" Value="#6758E8"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding}" Value="Apple Pay">
+          <Setter Property="Background" Value="#05070A"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding}" Value="Google Pay">
+          <Setter Property="Background" Value="#F8FAFC"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding}" Value="MoMo">
+          <Setter Property="Background" Value="#C01886"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PaymentMethodBadgeText" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding}" Value="Google Pay">
+          <Setter Property="Foreground" Value="#1F2937"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+
   <Grid Margin="20">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
@@ -123,66 +209,157 @@
 
     <!-- Khu vực tài khoản / ma trận đủ điều kiện thanh toán đã được gỡ; mọi tài khoản dùng khu vực proxy đã cấu hình ở trên. -->
 
-    <Grid Grid.Row="2" Margin="0,0,0,12">
-        <DataGrid x:Name="ResultsGrid"
-                ItemsSource="{Binding Results}"
-                IsReadOnly="True"
-                AutoGenerateColumns="False"
-                HeadersVisibility="Column"
-                GridLinesVisibility="Horizontal"
-                RowHeight="42"
-                Margin="0">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Tài khoản" Binding="{Binding AccountRef}" Width="135"/>
-          <DataGridTextColumn Header="Kết quả" Binding="{Binding ResultStatus}" Width="72"/>
-          <DataGridTextColumn Header="Tiến độ" Binding="{Binding ProgressText}" Width="64"/>
-          <DataGridTextColumn Header="Giai đoạn" Binding="{Binding CurrentStage}" Width="110"/>
-          <DataGridTextColumn x:Name="AuthorizationQueueColumn" Header="Hàng đợi ủy quyền BA" Binding="{Binding AuthorizationDisplay}" Width="92"/>
-          <DataGridTemplateColumn Header="Tiến độ giai đoạn" Width="125">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="12" Margin="6,0" VerticalAlignment="Center"/>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="Link thanh toán / mã QR" Width="*">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Grid Margin="6,2">
+    <Border Grid.Row="2"
+            Margin="0,0,0,12"
+            Background="{StaticResource PaymentListBg}"
+            BorderBrush="{StaticResource PaymentListLine}"
+            BorderThickness="1"
+            CornerRadius="6">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid Margin="14,10,14,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="42"/>
+            <ColumnDefinition Width="92"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="92"/>
+            <ColumnDefinition Width="76"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="#" Foreground="{StaticResource PaymentListMuted}" FontFamily="Consolas"/>
+          <TextBlock Grid.Column="1" Text="Kết quả" Foreground="{StaticResource PaymentListMuted}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Column="2" Text="Tài khoản / ưu đãi / phương thức" Foreground="{StaticResource PaymentListMuted}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Column="3" Text="Thời gian" Foreground="{StaticResource PaymentListMuted}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Column="4" Text="Thao tác" Foreground="{StaticResource PaymentListMuted}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+        </Grid>
+        <ListBox x:Name="ResultsGrid"
+                 Grid.Row="1"
+                 ItemsSource="{Binding Results}"
+                 ItemContainerStyle="{StaticResource PaymentResultItemContainer}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Border Margin="10,0,10,8"
+                      Padding="12,10"
+                      MinHeight="76"
+                      Background="{StaticResource PaymentListRowBg}"
+                      BorderBrush="{StaticResource PaymentListLine}"
+                      BorderThickness="0,0,0,1"
+                      CornerRadius="5">
+                <Grid>
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="42"/>
+                    <ColumnDefinition Width="92"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="76"/>
                   </Grid.ColumnDefinitions>
-                  <TextBlock Text="{Binding ResultKind}"
-                             Foreground="{DynamicResource TextSub}"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0"/>
-                  <TextBlock Grid.Column="1"
-                             Text="{Binding ResultDisplay}"
-                             ToolTip="{Binding ResultDisplay}"
+                  <TextBlock Text="{Binding RowNumber}"
+                             Foreground="{StaticResource PaymentListMuted}"
                              FontFamily="Consolas"
-                             TextTrimming="CharacterEllipsis"
                              VerticalAlignment="Center"/>
-                  <Button Grid.Column="2"
-                          Width="30"
-                          Height="28"
-                          Padding="0"
-                          Margin="8,0,0,0"
-                          Command="{Binding DataContext.CopyResultCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                          CommandParameter="{Binding}"
-                          IsEnabled="{Binding HasCopyableResult}"
-                          ToolTip="{Binding CopyToolTip}">
-                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="13"/>
-                  </Button>
+                  <Border Grid.Column="1"
+                          Style="{StaticResource PaymentStatusBadge}"
+                          VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusBadgeText}"
+                               Foreground="#F8FAFC"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                  </Border>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AccountRef}"
+                               Foreground="{StaticResource PaymentListText}"
+                               FontFamily="Consolas"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding AccountRef}"/>
+                    <Grid Margin="0,8,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <ItemsControl ItemsSource="{Binding MethodBadges}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel/>
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Style="{StaticResource PaymentMethodBadge}">
+                              <TextBlock Text="{Binding}" Style="{StaticResource PaymentMethodBadgeText}"/>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding ResultDisplay}"
+                                 Foreground="{StaticResource PaymentListMuted}"
+                                 FontFamily="Consolas"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding ResultDisplay}"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ProgressPercent}"
+                                 Height="4"
+                                 Margin="0,8,18,0"
+                                 Background="#0B1018"
+                                 Foreground="#64748B"/>
+                  </StackPanel>
+                  <TextBlock Grid.Column="3"
+                             Text="{Binding ElapsedText}"
+                             Foreground="{StaticResource PaymentListMuted}"
+                             FontFamily="Consolas"
+                             VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="4"
+                              Orientation="Horizontal"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center">
+                    <Button Width="32"
+                            Height="32"
+                            Padding="0"
+                            Margin="0,0,6,0"
+                            Background="#0B1018"
+                            BorderBrush="{StaticResource PaymentListLine}"
+                            Command="{Binding DataContext.CopyResultCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"
+                            IsEnabled="{Binding HasCopyableResult}"
+                            ToolTip="{Binding CopyToolTip}">
+                      <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#CBD5E1"/>
+                    </Button>
+                    <Border Width="32"
+                            Height="32"
+                            CornerRadius="4"
+                            Background="#0B1018"
+                            BorderBrush="{StaticResource PaymentListLine}"
+                            BorderThickness="1"
+                            ToolTip="{Binding CurrentStage}">
+                      <TextBlock Text="&#xE10A;"
+                                 FontFamily="Segoe MDL2 Assets"
+                                 FontSize="11"
+                                 Foreground="#94A3B8"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"/>
+                    </Border>
+                  </StackPanel>
                 </Grid>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTextColumn Header="Số lần thử lại" Binding="{Binding Attempts}" Width="72"/>
-        </DataGrid.Columns>
-      </DataGrid>
-    </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
 
     <Grid Grid.Row="3">
       <Grid.ColumnDefinitions>

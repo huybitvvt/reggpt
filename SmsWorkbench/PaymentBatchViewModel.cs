@@ -263,10 +263,12 @@ namespace SmsWorkbench
             Results.Clear();
             _terminalProgressAccounts.Clear();
             _acceptProgress = true;
+            int queuedIndex = 1;
             foreach (PaymentBatchAccount account in request.Accounts)
             {
                 Results.Add(new PaymentBatchResultRow
                 {
+                    RowNumber = queuedIndex++,
                     AccountRef = account.Email,
                     CurrentStage = "Đang chờ",
                     ProgressText = "0%",
@@ -744,19 +746,22 @@ namespace SmsWorkbench
                 if (terminalState.Equals("canceled", StringComparison.OrdinalIgnoreCase))
                     terminalState = "cancelled";
                 string resultKind = paymentUrlPresent
-                    ? "Thanh toánLink"
+                    ? "Link thanh toán"
                     : qrDataPresent
                         ? "Nội dung mã QR"
                         : qrPathPresent ? "File mã QR" : "";
                 string resultValue = FirstNonEmpty(paymentUrl, qrData, qrPath);
+                string detailText = PaymentDetailText(row, decision);
                 Results.Add(new PaymentBatchResultRow
                 {
+                    RowNumber = Results.Count + 1,
                     AccountRef = ResolveAccountDisplay(JsonString(row, "account_ref")),
                     MatrixCell = JsonString(row, "matrix_cell"),
                     AuthStatus = JsonBool(row, "authenticated") ? "200" : "Thất bại",
                     RefreshStatus = JsonBool(row, "refreshed") ? "Đã làm mới" : "Chưa làm mới",
                     Eligibility = eligibility,
                     Decision = decision.Length > 0 ? decision : JsonString(row, "error"),
+                    DetailText = detailText,
                     TerminalState = terminalState,
                     ErrorStage = JsonString(row, "error_stage"),
                     Retryable = JsonBool(row, "retryable"),
@@ -767,6 +772,8 @@ namespace SmsWorkbench
                     AuthorizationStatus = JsonString(row, "authorization_status"),
                     ProgressPercent = 100,
                     ProgressText = "100%",
+                    ElapsedText = FormatDuration(JsonDouble(row, "elapsed_seconds", "duration_seconds", "total_seconds", "timing_total_seconds")),
+                    MethodBadges = PaymentBadges(row, SelectedMethod?.Id),
                     CurrentStage = "Hoàn tất",
                     ResultStatus = JsonBool(row, "ok")
                         || terminalState.Equals("completed", StringComparison.OrdinalIgnoreCase)
@@ -804,11 +811,139 @@ namespace SmsWorkbench
             return int.TryParse(value.ToString(), out number) ? number : 0;
         }
 
+        private static double JsonDouble(JsonElement element, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (!element.TryGetProperty(name, out JsonElement value)) continue;
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double number)) return number;
+                if (double.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)) return number;
+            }
+            return 0;
+        }
+
         private static bool JsonBool(JsonElement element, string name)
             => element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.True;
 
         private static string FirstNonEmpty(params string[] values)
             => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? "";
+
+        private static string FormatDuration(double seconds)
+        {
+            if (seconds <= 0) return "0.0s";
+            if (seconds < 60) return seconds.ToString("0.0", CultureInfo.InvariantCulture) + "s";
+            int minutes = (int)(seconds / 60);
+            int rest = (int)Math.Round(seconds - minutes * 60);
+            if (rest >= 60)
+            {
+                minutes++;
+                rest = 0;
+            }
+            return $"{minutes}m{rest:D2}s";
+        }
+
+        private static IReadOnlyList<string> PaymentBadges(JsonElement row, string? selectedMethod)
+        {
+            var badges = new List<string>();
+            if (JsonBool(row, "eligible"))
+                badges.Add("Trial: 0 đ");
+
+            foreach (string method in PaymentMethodValues(row))
+            {
+                string badge = PaymentMethodBadge(method);
+                if (badge.Length > 0 && !badges.Contains(badge, StringComparer.OrdinalIgnoreCase))
+                    badges.Add(badge);
+            }
+
+            string selectedBadge = PaymentMethodBadge(selectedMethod ?? "");
+            bool hasPositiveResult = JsonBool(row, "ok")
+                || JsonBool(row, "url_present")
+                || JsonBool(row, "long_url_present")
+                || JsonBool(row, "qr_data_present")
+                || JsonBool(row, "qr_path_present")
+                || FirstNonEmpty(JsonString(row, "url"), JsonString(row, "long_url"), JsonString(row, "qr_data"), JsonString(row, "qr_path")).Length > 0;
+            if (hasPositiveResult && selectedBadge.Length > 0 && !badges.Contains(selectedBadge, StringComparer.OrdinalIgnoreCase))
+                badges.Add(selectedBadge);
+
+            if (badges.Count == 0)
+            {
+                string decision = JsonString(row, "decision");
+                if (decision.Length > 0) badges.Add(decision);
+            }
+            return badges;
+        }
+
+        private static string PaymentDetailText(JsonElement row, string decision)
+        {
+            var parts = new List<string>();
+            string amount = JsonString(row, "amount_due");
+            string currency = JsonString(row, "currency");
+            if (amount.Length > 0)
+                parts.Add("Số tiền: " + amount + (currency.Length > 0 ? " " + currency : ""));
+
+            string decisionText = FirstNonEmpty(
+                JsonString(row, "decision_text"),
+                JsonString(row, "qr_error"),
+                JsonString(row, "error"));
+            if (decisionText.Length > 0 && !decisionText.Equals(decision, StringComparison.OrdinalIgnoreCase))
+                parts.Add(TranslatePaymentReason(decisionText));
+
+            string methods = string.Join(", ", PaymentMethodValues(row).Select(PaymentMethodBadge).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
+            if (methods.Length > 0)
+                parts.Add("Method: " + methods);
+
+            return parts.Count > 0 ? string.Join(" · ", parts) : "";
+        }
+
+        private static string TranslatePaymentReason(string value)
+        {
+            string text = value ?? "";
+            return text
+                .Replace("Checkout 创建失败，结果不确定", "Tạo checkout thất bại, chưa xác định kết quả")
+                .Replace("Stripe init 未返回明确的支付方式列表", "Stripe init chưa trả danh sách phương thức rõ ràng")
+                .Replace("优惠不是 0 元", "Ưu đãi không phải 0đ")
+                .Replace("未检测到 MoMo", "Không phát hiện MoMo")
+                .Replace("未出可扫码", "Chưa tạo được mã quét");
+        }
+
+        private static IEnumerable<string> PaymentMethodValues(JsonElement row)
+        {
+            foreach (string name in new[] { "methods", "payment_method_types", "ordered_payment_method_types" })
+            {
+                if (!row.TryGetProperty(name, out JsonElement value) || value.ValueKind != JsonValueKind.Array) continue;
+                foreach (JsonElement item in value.EnumerateArray())
+                {
+                    string text = item.ValueKind == JsonValueKind.String ? item.GetString() ?? "" : item.ToString();
+                    if (!string.IsNullOrWhiteSpace(text)) yield return text;
+                }
+            }
+        }
+
+        private static string PaymentMethodBadge(string method)
+        {
+            string value = (method ?? "").Trim().ToLowerInvariant().Replace("-", "_").Replace(" ", "_");
+            return value switch
+            {
+                "card" or "direct_card" => "Card",
+                "apple_pay" or "applepay" => "Apple Pay",
+                "google_pay" or "googlepay" => "Google Pay",
+                "momo" => "MoMo",
+                "paypal" => "PayPal",
+                "gopay" => "GoPay",
+                "gcash" => "GCash",
+                "grabpay" => "GrabPay",
+                "upi" => "UPI",
+                "kakao" => "Kakao Pay",
+                "naver" or "naver_pay" => "Naver Pay",
+                "pix" => "PIX",
+                "ideal" => "iDEAL",
+                "blik" => "BLIK",
+                "twint" => "TWINT",
+                "qris" => "QRIS",
+                "bizum" => "Bizum",
+                _ => method?.Trim() ?? ""
+            };
+        }
 
         private static string CreateBatchId(string paymentMethod)
             => PaymentMethods.Normalize(paymentMethod) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);

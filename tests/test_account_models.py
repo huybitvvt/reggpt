@@ -89,3 +89,124 @@ def test_storage_persists_safe_account_identity_context(tmp_path, monkeypatch):
     assert payload["identity_context"]["proxy_affinity"]["session_id"] == "NEW5678"
     assert "proxy-secret" not in record["raw_json"]
     assert base_proxy not in record["raw_json"]
+
+
+def test_payment_detection_fields_survive_safe_snapshot_and_storage(tmp_path, monkeypatch):
+    database = tmp_path / "accounts.sqlite3"
+    monkeypatch.setattr(storage, "database_path", lambda cfg=None: database)
+    payment_capability = {
+        "ok": True,
+        "status": "completed",
+        "checked_at": 1788240000,
+        "payment_method_types": ["card", "momo"],
+        "custom_payment_methods": ["gcash"],
+        "amount_due": 0,
+        "currency": "VND",
+        "offer_state": "zero_due",
+        "badges": ["Trial · 0 đ", "Card", "MoMo", "GCash"],
+    }
+    account = {
+        "email": "payment-badges@example.com",
+        "success": True,
+        "access_token": "at-secret-value",
+        "payment_capability": payment_capability,
+        "payment_method_badges": payment_capability["badges"],
+        "payment_method_types": payment_capability["payment_method_types"],
+        "custom_payment_methods": payment_capability["custom_payment_methods"],
+        "amount_due": 0,
+        "currency": "VND",
+        "offer_state": "zero_due",
+    }
+
+    assert storage.upsert_account(account)
+    record = storage.get_account_record(account["email"])
+    payload = json.loads(record["raw_json"])
+
+    assert payload["payment_method_badges"] == payment_capability["badges"]
+    assert payload["payment_method_types"] == ["card", "momo"]
+    assert payload["custom_payment_methods"] == ["gcash"]
+    assert payload["amount_due"] == 0
+    assert payload["currency"] == "VND"
+    assert payload["offer_state"] == "zero_due"
+    assert payload["payment_check_status"] == "completed"
+    assert payload["payment_check_error"] == ""
+    assert payload["payment_checked_at"] == 1788240000
+    assert payload["payment_capability"]["ok"] is True
+    assert "at-secret-value" not in record["raw_json"]
+
+
+def test_inline_offer_fields_survive_safe_snapshot_and_storage(tmp_path, monkeypatch):
+    database = tmp_path / "accounts.sqlite3"
+    monkeypatch.setattr(storage, "database_path", lambda cfg=None: database)
+    probe = {
+        "ok": True,
+        "promotion_status": "Có thể dùng thử Plus·-100%·x1 tháng",
+        "plus_trial_eligible": True,
+        "plus_trial_campaign_id": "real-campaign",
+        "current_plan_type": "free",
+    }
+    account = {
+        "email": "inline-offer@example.com",
+        "success": True,
+        "access_token": "at-secret-value",
+        "plan_type": "free",
+        "promotion_status": probe["promotion_status"],
+        "promotion_result": probe,
+        "promotion": {
+            "status": probe["promotion_status"],
+            "updated_at": 123,
+            "last_result": probe,
+        },
+    }
+
+    assert storage.upsert_account(account)
+    record = storage.get_account_record(account["email"])
+    payload = json.loads(record["raw_json"])
+
+    assert payload["promotion_status"] == probe["promotion_status"]
+    assert payload["promotion_result"]["plus_trial_campaign_id"] == "real-campaign"
+    assert payload["promotion"]["last_result"]["plus_trial_eligible"] is True
+    assert record["plan_type"] == "free"
+    assert "at-secret-value" not in record["raw_json"]
+
+
+def test_mark_promotion_persists_payment_detection_without_copying_session_token(tmp_path, monkeypatch):
+    database = tmp_path / "accounts.sqlite3"
+    session_path = tmp_path / "session_payment@example.com.json"
+    monkeypatch.setattr(storage, "database_path", lambda cfg=None: database)
+    session_path.write_text(json.dumps({
+        "email": "payment@example.com",
+        "success": True,
+        "access_token": "at-must-stay-out-of-raw-json",
+    }), encoding="utf-8")
+    assert storage.upsert_account({
+        "email": "payment@example.com",
+        "success": True,
+        "access_token": "at-must-stay-out-of-raw-json",
+    }, json_path=str(session_path))
+
+    probe = {
+        "ok": True,
+        "promotion_status": "Có thể dùng thử Plus",
+        "payment_method_badges": ["Trial · 0 đ", "Card", "MoMo"],
+        "payment_method_types": ["card", "momo"],
+        "custom_payment_methods": [],
+        "amount_due": 0,
+        "currency": "VND",
+        "offer_state": "zero_due",
+        "payment_capability": {"ok": True, "amount_minor": 0, "currency": "VND"},
+    }
+    assert storage.mark_promotion_status(
+        "payment@example.com", probe["promotion_status"], promotion_result=probe
+    )
+
+    record = storage.get_account_record("payment@example.com")
+    raw = json.loads(record["raw_json"])
+    saved_session = json.loads(session_path.read_text(encoding="utf-8"))
+    assert raw["payment_method_badges"] == probe["payment_method_badges"]
+    assert raw["payment_method_types"] == ["card", "momo"]
+    assert raw["amount_due"] == 0
+    assert raw["currency"] == "VND"
+    assert "at-must-stay-out-of-raw-json" not in record["raw_json"]
+    assert saved_session["access_token"] == "at-must-stay-out-of-raw-json"
+    assert saved_session["payment_method_badges"] == probe["payment_method_badges"]

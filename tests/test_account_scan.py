@@ -50,7 +50,7 @@ class AccountScanTests(unittest.TestCase):
                 "oauth": {"ok": True},
             }
         )
-        self.assertEqual(overview["at_status"], "AT失效已刷新")
+        self.assertEqual(overview["at_status"], "AT hết hiệu lực đã làm mới")
 
     def test_overview_does_not_treat_negative_dropped_label_as_truthy(self):
         overview = account_scan._scan_overview(
